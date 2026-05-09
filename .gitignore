@@ -35,6 +35,12 @@ Thumbs.db
 # Local project data
 config.yaml
 *.bean
+read_bean.py
 
+test.py
 
+开发文档.md
 从零搭建BeanBot教学文档.md
+CLAUDE.md
+BeanBot教学-基础篇.md
+BeanBot教学-进阶篇.md

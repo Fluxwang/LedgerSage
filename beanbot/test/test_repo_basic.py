@@ -19,3 +19,7 @@ print("\n=== 条目数量 ===")
 print(f"总条目数: {len(repo.entries)}")
 
 print(f"mtimes 中的内容: {repo.mtimes}")
+
+print(f"账户数量: {len(repo.accounts)}")
+print(f"指令数量: {len(repo.entries)}")
+print(f"默认货币: {repo.options['operating_currency']}")

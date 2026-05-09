@@ -18,6 +18,14 @@ class ImmutableDict(dict):
         del key
         raise _IMMUTABLE_ERROR
 
+    def __setattr__(self, key, value):
+        del key, value
+        raise TypeError("ImmutableDict does not support attribute assignment")
+
+    def __delattr__(self, key):
+        del key
+        raise TypeError("ImmutableDict does not support attribute deletion")
+
     # d.update({"a":1, "b":2})
     def update(self, *args, **kwargs):
         # *args 接收任意数量的位置参数
