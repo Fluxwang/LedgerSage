@@ -18,6 +18,11 @@ def configure(controller):
     _controller = controller
 
 
+# 函数级包装函数
+def build_db():
+    return get_controller().build_db()
+
+
 class BotController:
     def __init__(
         self, settings, repository, ledger_service, query_service, vector_service
@@ -110,8 +115,10 @@ class BotController:
     def build_db(self):
         """构建向量数据库"""
         try:
-            if not self.settings.embedding.get("enable", True):
+            if not self.settings.embedding.get("enable", False):
                 return BaseMessage(content="embedding not enabled")
-            return BaseMessage(content="Vecter DB built (placeholder)")
+            tokens = self.vector_service.build_transaction_db(self.repository.entries)
+            # return BaseMessage(content=("Token usage: {tokens}").format(tokens=tokens))
+            return BaseMessage(content=f"Token usage: {tokens}")
         except Exception as e:
             return ErrorMessage(content=str(e), exception=e)

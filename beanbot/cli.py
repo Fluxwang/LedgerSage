@@ -20,8 +20,3 @@ def main():
         from beanbot.bots.telegram_bot import run_bot
 
         run_bot(context.settings, context.logger)
-    elif args.platform == "mattermost":
-        print("mattermost")
-        # from beanbot.bots.mattermost_bot import run_bot
-        #
-        # run_bot(context.settings, context.logger)

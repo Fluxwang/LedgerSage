@@ -27,15 +27,19 @@ class BeancountRepository:
 
     def _load(self):
         """加载账本文件"""
+        # extries 中会包含Open, Transaction, Balance(断言), Price(汇率), Note(备注)
         self._entries, errors, self._options = loader.load_file(self.filename)
+
+        # 所有的account 集合, Income, Expenses, Assets, Equity, Liabilities
         self._accounts = set()
         self.mtimes = {}
+        # 你Open Account 的文件地址
         self.account_files = set()
 
         for error in errors:
             self.logger.warning("Beancount load error: %s", error)
 
-        # 收集账户列表
+        # 收集account 集合
         for entry in self._entries:
             if isinstance(entry, d.Open):
                 self._accounts.add(entry.account)
@@ -44,14 +48,22 @@ class BeancountRepository:
                 self._accounts.remove(entry.account)
                 self.account_files.remove(entry.meta["filename"])
 
+        # options中的inlude 会包含main.bean中include 的所有文件地址
         for include_file in self._options["include"]:
             # 获取文件最后修改时间
             self.mtimes[include_file] = Path(include_file).stat().st_mtime
 
+            # dcontext 为 Display Context, 控制数字显示的小数位数和对其格式
         self._printer = EntryPrinter(dcontext=self._options.get("dcontext"))
 
     def _auto_reload(self, accounts_only: bool = False):
-        """自动更新, 当设置accounts_only 将只检查account条目更新"""
+        """检测到文件有变化时，调用 self._load()
+        Args:
+            accounts_only:
+                当 accounts_only=False, 就会检查所有 included文件, 就是你的整个账本系统中的所有账本文件
+            包括你的日常开销类目
+                当 accounts_only=True, 就只检查有 Open/Close 条目的文件
+        """
         files_to_check = self.mtimes.keys()
         if accounts_only:
             files_to_check = self.account_files
@@ -93,6 +105,7 @@ class BeancountRepository:
         if not candidates:
             return None
 
+        # 使用深度i(在第几层匹配到的账户)值来进行排序，从小到大排序, 然后取[0] 的 [1] 就是账户信息
         candidates.sort(key=lambda x: x[0])
         return candidates[0][1]
 
@@ -150,6 +163,14 @@ class BeancountRepository:
         tags: set[str] | None = None,
         date: datetime | None = None,
     ) -> d.Transaction:
+        """构建交易条目
+        Args:
+            from_account: 这笔金额是从哪个账户流出的
+            to_account: 这笔金额流入哪个账户
+            tags: 不传为空集合，date 不传用今天
+        Returns:
+            d.Transaction
+        """
         # 创建一个新的元数据容器, <generated>对应filename参数，告诉系统这条数据是被生成的，并不存在于实际的物理账本目录中
         meta = d.new_metadata("<generated>", 0)
         postings = [
@@ -163,8 +184,9 @@ class BeancountRepository:
             ),
             d.Posting(
                 account=to_account,
-                units=Amount(-amount, self.currency),
+                # units=Amount(-amount, self.currency),
                 # units=MISSING,
+                units=None,
                 cost=None,
                 price=None,
                 flag=None,

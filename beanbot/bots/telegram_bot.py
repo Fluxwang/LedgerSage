@@ -205,6 +205,13 @@ async def clone_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def build(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = controller.build_db()
+    if update.message is None:
+        return
+    await update.message.reply_text(text=msg.content)
+
+
 def run_bot(settings, logger):
     app = ApplicationBuilder().token(settings.bot.telegram.token).build()
     app.add_handler(CommandHandler("start", start))
@@ -212,6 +219,7 @@ def run_bot(settings, logger):
     app.add_handler(CommandHandler("expense", expense))
     # app.add_handler(CommandHandler("render", render))
     app.add_handler(CommandHandler("clone", clone_transaction))
+    app.add_handler(CommandHandler("build", build))
     # filters.TEXT: 匹配所有包含文字内容的消息, filters.COMMAND: 匹配以 / 开头的指令消息 ~为取反的意思
     # ~filters.COMMAND 就是不是指令的消息
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, render))

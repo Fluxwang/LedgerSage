@@ -1,3 +1,5 @@
+import contextlib
+from datetime import datetime
 from decimal import Decimal
 
 from beanbot.i18n import gettext as _
@@ -20,7 +22,7 @@ class LedgerService:
         Args:
             args: 已解析的参数列表，至少包含金额、付款
             账户和收款账户/商户。
-                示例：["35", "CMB", "KFC", "午饭","#food"]。
+                示例：["35", "CMB","Expenses:Food:Lunch", "KFC", "午饭","#food"]。
 
         Returns:
             格式化后的交易文本。
@@ -73,8 +75,30 @@ class LedgerService:
     def generate_transactions(self, line: str) -> list[str]:
         args = parse_args(line)
         try:
+            # 先尝试直接生成交易
             return [self.build_transaction(args)]
         except ValueError as original_error:
+            vec_enabled = self.settings.embedding.get("enable", False)
+            rag_enabled = self.settings.rag.get("enable", False)
+            if rag_enabled:
+                today = str(datetime.now().astimezone().date())
+                accounts = [
+                    account
+                    for account in map(self.repository.find_account, args[1:])
+                    if account
+                ]
+                completion = self.vector_service.complete_with_rag(
+                    args, today, accounts
+                )
+                # 使用 clone_transaction 变标准格式
+                return [self.clone_transaction(completion)]
+            if vec_enabled:
+                candidate_transactions = []
+                for new_args in self.vector_service.modify_args_via_vector(args):
+                    with contextlib.suppress(ValueError):
+                        candidate_transactions.append(self.build_transaction(new_args))
+                if candidate_transactions:
+                    return candidate_transactions
             raise original_error
 
     def clone_transaction(self, text: str, amount=None) -> str:
