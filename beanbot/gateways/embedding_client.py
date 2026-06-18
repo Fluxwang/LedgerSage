@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import requests
 
-TIMEOUT = 30
+TIMEOUT = 120
 
 
 class EmbeddingClient:
