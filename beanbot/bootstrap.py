@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from logging import Logger
-# from typing import Any
+from datetime import datetime
+from pathlib import Path
 
 from beanbot.bots.controller import BotController
 from beanbot.gateways.beancount_repo import BeancountRepository
@@ -45,9 +46,15 @@ def bootstrap_app(config_path: str) -> AppContext:
     init_locale(settings)
     logger = init_logging(settings)
 
+    current_month_file = str(
+        Path(str(settings.beancount.write_dir))
+        / datetime.now().strftime("%m-expenses.bean")
+    )
+
     # 初始化 repository
     repository = BeancountRepository(
         filename=str(settings.beancount.filename),
+        write_filename=current_month_file,
         currency=str(settings.beancount.currency),
         logger=logger,
     )

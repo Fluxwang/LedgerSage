@@ -19,8 +19,11 @@ NO_TRANSACTION_ERROR = ValueError("No Transaction found")
 class BeancountRepository:
     """账本数据访问层"""
 
-    def __init__(self, filename: str | Path, currency: str, logger):
+    def __init__(
+        self, filename: str | Path, write_filename: str | Path, currency: str, logger
+    ):
         self.filename = filename
+        self.write_filename = write_filename
         self.currency = currency
         self.logger = logger
         self._load()
@@ -287,16 +290,16 @@ class BeancountRepository:
           subprocess.CalledProcessError: bean-format
           格式化失败时抛出
         """
-        path = Path(self.filename)
+        path = Path(self.write_filename)
         prefix = "" if path.stat().st_size == 0 else "\n"
 
         # 追加新的交易内容
-        with open(self.filename, "a", encoding="utf-8") as f:
+        with open(self.write_filename, "a", encoding="utf-8") as f:
             f.write(prefix + data.strip("\n") + "\n")
 
         # 格式化文件
         subprocess.run(
-            ["bean-format", "-o", str(self.filename), str(self.filename)],
+            ["bean-format", "-o", str(self.write_filename), str(self.write_filename)],
             check=True,
             shell=False,
         )
