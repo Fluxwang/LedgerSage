@@ -135,6 +135,7 @@ async def render(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"```beancount\n{escape_md2(transaction)}\n```",
             parse_mode="MarkdownV2",
             reply_markup=reply_markup,
+            reply_to_message_id=update.message.message_id,
         )
 
 
@@ -162,7 +163,10 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
         if isinstance(result, ErrorMessage):
             await query.edit_message_text(text=result.content)
         else:
-            await query.edit_message_text(text="Transaction committed")
+            await query.edit_message_text(
+                text=f"```beancount\n{escape_md2(transaction)}\n```✅Transaction committed",
+                parse_mode="MarkdownV2",
+            )
 
 
 @owner_required
@@ -180,7 +184,9 @@ async def clone_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # reply_to.text 返回的是渲染后的纯文本
     text = reply_to.text_markdown_v2
     if "```beancount" not in text:
-        await update.message.reply_text(text="Not a transaction message")
+        # await update.message.reply_text(text="Not a transaction message")
+        await update.message.reply_text(text)
+
         return
     transaction = text.split("```beancount\n")[1].split("```")[0]
     result = controller.get_controller().clone_txs(transaction, amount)
