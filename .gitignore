@@ -50,4 +50,8 @@ Beancount
 read_bean.py
 tx_db.sqlite
 beanbot/test/*
-
+.env
+docs/*
+从零搭建BeanBot-Web版教学文档（上）.md
+从零搭建BeanBot-Web版教学文档（中）.md
+从零搭建BeanBot-Web版教学文档（下）.md
