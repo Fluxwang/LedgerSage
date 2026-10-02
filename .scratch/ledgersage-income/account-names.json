@@ -1,0 +1,14 @@
+{
+  "Income:CN:RedEnvelope": "红包收入",
+  "Income:CN:Extra": "咨询与打赏收入",
+  "Income:CN:Rebate": "退款返款",
+  "Income:CN:CreditCard:Other": "其他信用卡优惠",
+  "Income:CN:Other": "其他收入",
+  "Income:CN:Invest": "投资收入",
+  "Income:CN:Compensation": "赔付款",
+  "Income:CN:Sales": "二手售卖收入",
+  "Income:CN:Allowance": "上学生活费",
+  "Income:CN:School": "学校补贴",
+  "Expenses:Entertainment:Other": "其他娱乐支出",
+  "Expenses:Government:IncomeTax": "个人所得税"
+}
