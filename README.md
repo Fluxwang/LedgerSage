@@ -1,153 +1,49 @@
-# BeanBot
+# BeanChat / LedgerSage
 
-**Language:** English | [中文](README_ZH.md)
+BeanChat turns natural-language messages into auditable Beancount entries. It supports multiple users, one isolated git-backed ledger per user, clarifying questions, fixed read-only query tools, budgets, live decision traces, dashboards, and run history.
 
----
+Ledger files remain the only source of truth for financial data. SQLite stores users, sessions, LangGraph checkpoints, and decision traces.
 
-BeanBot is a Telegram bot that lets you record [Beancount](https://github.com/beancount/beancount) transactions using natural language. Just send a message like `35 CMB KFC lunch` and BeanBot will generate a properly formatted double-entry accounting entry, waiting for your confirmation before writing it to the ledger.
+## Run locally
 
-> Inspired by [beancount-bot](https://github.com/StdioA/beancount-bot) by StdioA.
+Python 3.12+ and Node 20+ are required.
 
-## Features
+```bash
+cp .env.example .env
+# Fill every required secret in .env.
+python -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+cd web && npm install && npm run build && cd ..
+.venv/bin/python -m beanbot serve
+```
 
-- **Natural language input**: Send a description, get a Beancount transaction
-- **Interactive confirmation**: Inline Submit / Cancel buttons before writing
-- **Vector recall**: Embedding-based account completion from transaction history
-- **RAG completion**: LLM-powered completion for complex or ambiguous input
-- **Query commands**: `/expense` and `/bill` to view monthly spending summaries
-- **Clone transactions**: Reply to an existing transaction with `/clone` to duplicate it
-- **Hot reload**: Automatically reloads the ledger file when it changes on disk
+Open <http://localhost:8000>. Create more invitation codes with `.venv/bin/python -m beanbot invite --count 3`.
+
+Configuration comes only from environment variables. `JWT_SECRET`, `INVITE_CODE`, `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` are required; startup fails with the missing field names. See `.env.example` for optional embedding settings.
 
 ## Architecture
 
-```
-gateways → services → controller → bots
-```
+- `beanbot/api/`: FastAPI routes, authentication, SSE, dashboard, and run history.
+- `beanbot/services/agent/`: LangGraph classify/extract/ask/tool/reply graph and fixed query tools.
+- `beanbot/gateways/ledger.py`: per-user Beancount loading, append-only writes, git commits, and undo.
+- `beanbot/storage/`: versioned SQLite business schema. LangGraph checkpoint tables share the database.
+- `beanbot/services/vector_index.py`: per-user incremental vector indexes.
+- `web/`: React, Vite, and TypeScript client. `frontend/index.html` remains the visual reference.
 
-| Layer | Module | Description |
-|-------|--------|-------------|
-| Gateway | `beancount_repo.py` | Read/write `.bean` files, wraps beancount parser |
-| Gateway | `embedding_client.py` | OpenAI-compatible Embedding API client |
-| Gateway | `vector_store/` | Vector database (SQLite or JSON fallback) |
-| Service | `ledger_service.py` | Core accounting logic, coordinates parser / vector / RAG |
-| Service | `vector_service.py` | Vector DB build and account recall |
-| Service | `query_service.py` | BQL queries for expense reports |
-| Controller | `controller.py` | Boundary between bot and services, unified error handling |
-| Bot | `telegram_bot.py` | Telegram message handling and command routing |
+Every ledger write takes an in-process lock, appends canonical text, stages only the target file, and creates one git commit. Run Uvicorn with exactly one worker. Multiple workers do not share these locks and can lose concurrent writes.
 
-## Getting Started
-
-### 1. Requirements
-
-- Python 3.12+
-- A Beancount ledger file (`.bean`)
-- A Telegram Bot Token (get one from [@BotFather](https://t.me/BotFather))
-
-### 2. Install Dependencies
+## Tests
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+.venv/bin/python -m pytest
+.venv/bin/python -m mypy beanbot
+cd web && npm run build
 ```
 
-### 3. Configuration
+The test suite uses no API key. The opt-in real-model classification evaluation is `python -m tests.eval.classify`.
 
-Create `config.yaml` in the project root (it is gitignored):
+## Docker
 
-```yaml
-beancount:
-  filename: /path/to/your/main.bean   # Main ledger file
-  write_dir: /path/to/your/ledger/    # Directory for new transactions (current month file)
-  currency: CNY                        # Default currency
-  account_distinguation_range: 3       # Prefix length for fuzzy account matching
+Run `docker compose up --build` after creating `.env`. The image builds the React client, includes git, and runs one Uvicorn worker. `beanchat-ledgers` is the financial source-of-truth volume; arrange an external backup before production use. A backup transport is intentionally not selected yet.
 
-bot:
-  telegram:
-    token: "YOUR_BOT_TOKEN"
-    chat_id: 123456789                 # Your Telegram chat_id (only this user can operate)
-
-# Optional: enable Embedding-based vector recall
-embedding:
-  enable: false
-  # url: http://localhost:11434/v1/embeddings
-  # model: nomic-embed-text
-
-# Optional: enable RAG completion via LLM
-rag:
-  enable: false
-  # url: http://localhost:11434/v1/chat/completions
-  # model: qwen2.5
-```
-
-### 4. Run
-
-```bash
-python -m beanbot telegram -c config.yaml
-```
-
-## Telegram Commands
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Show bot status and uptime |
-| `/expense` | Query current month's expenses by category |
-| `/bill` | Query current month's bill details |
-| `/clone [amount]` | Reply to a transaction message to clone it, optionally with a new amount |
-| `/build` | Rebuild the vector database (when embedding is enabled) |
-| Plain text | Parsed as a transaction and shown as a preview awaiting confirmation |
-
-## Natural Language Format
-
-Basic message format:
-
-```
-<amount> <from-account> <to-account-or-payee> [description] [#tag]
-```
-
-Examples:
-
-```
-35 CMB KFC lunch #food
-120 CMB Expenses:Shopping:Clothing bought a shirt
-```
-
-- `CMB` fuzzy-matches to `Assets:Bank:CMB`
-- `KFC` is inferred from transaction history to its expense account
-- With vector recall enabled, partial or misspelled account names are completed automatically
-
-## Vector Recall & RAG (Optional)
-
-When direct parsing fails, BeanBot falls back in this order:
-
-1. **Vector recall** (`embedding.enable: true`): Finds similar historical transactions and infers likely account combinations
-2. **RAG completion** (`rag.enable: true`): Sends the input to a local LLM to generate a complete transaction
-
-Both support local models via any OpenAI-compatible API (e.g. Ollama).
-
-## Development & Testing
-
-Test scripts are in `beanbot/test/` and must be run as modules from the repo root:
-
-```bash
-python -m beanbot.test.test_vector_service
-python -m beanbot.test.test_sqlite_vector_store_build
-```
-
-## Roadmap
-
-- [x] Telegram Bot with natural language transaction input
-- [x] Vector recall via Embedding
-- [x] RAG completion via local LLM
-- [ ] Flask RESTful API to decouple the bot from core services
-- [ ] Mobile-friendly Web App based on the Flask backend, for recording transactions in the browser
-
-## Dependencies
-
-Core: `beancount`, `beanquery`, `python-telegram-bot`, `pyyaml`, `sqlite-vec`, `requests`
-
-Full list: [requirements.txt](requirements.txt)
-
-## License
-
-[MIT](LICENSE)
+For legacy account comments, run `python -m beanbot migrate-account-names /path/to/ledger` to preview display-name changes. Supply `--names names.json` for approved manual names (an account-to-name mapping). After reviewing the names and committing existing ledger changes, add `--apply` to migrate, validate, and create a separate ledger commit. Existing display names are preserved; validation failure restores the original files.

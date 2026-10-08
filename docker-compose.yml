@@ -1,0 +1,16 @@
+services:
+  beanchat:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    environment:
+      DATA_DIR: /app/data
+      LEDGER_ROOT: /app/ledgers
+    volumes:
+      - beanchat-data:/app/data
+      - beanchat-ledgers:/app/ledgers
+    restart: unless-stopped
+    # 必须保持单 worker：写入串行化靠的是进程内的 per-ledger 锁（ADR-0002）。
+volumes:
+  beanchat-data:
+  beanchat-ledgers:
