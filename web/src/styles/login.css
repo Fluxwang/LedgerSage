@@ -1,0 +1,65 @@
+/* ---------- 登录 ---------- */
+.login {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(47, 111, 78, 0.1), transparent 44%),
+    var(--bg);
+}
+.login form {
+  width: 392px;
+  padding: 40px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px rgba(35, 30, 24, 0.05),
+    0 18px 44px -24px rgba(35, 30, 24, 0.3);
+}
+.login .mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--green);
+  margin: 0 auto 14px;
+}
+.login h1 {
+  font: 28px/1 var(--serif);
+  text-align: center;
+}
+.login .tag {
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  margin: 7px 0 26px;
+}
+.login label {
+  display: block;
+  margin: 13px 0;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.login input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--raise);
+  border-radius: 8px;
+}
+.login input:focus {
+  outline: 2px solid rgba(47, 111, 78, 0.35);
+  outline-offset: -1px;
+}
+.login .btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
+}
+.login .err {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--red);
+}

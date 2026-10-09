@@ -28,16 +28,18 @@ from beanbot.config import Settings
 from beanbot.exceptions import AccountNotFound, LedgerWriteConflict, NotFound
 
 
-Direction = Literal['支出', '收入', '转账']
+Direction = Literal["支出", "收入", "转账"]
 
 
-def flow_direction(from_account: str | None, to_account: str | None) -> Direction | None:
+def flow_direction(
+    from_account: str | None, to_account: str | None
+) -> Direction | None:
     """由两条分录行的账户前缀推导方向；两侧都定不下来时返回 None（ADR 0014）。"""
-    if (to_account or '').startswith('Expenses:'):
-        return '支出'
-    if (from_account or '').startswith('Income:'):
-        return '收入'
-    return '转账' if from_account and to_account else None
+    if (to_account or "").startswith("Expenses:"):
+        return "支出"
+    if (from_account or "").startswith("Income:"):
+        return "收入"
+    return "转账" if from_account and to_account else None
 
 
 class TransactionInput(BaseModel):
@@ -51,15 +53,17 @@ class TransactionInput(BaseModel):
 
     @model_validator(mode="after")
     def normalize_flow(self):
-        if self.to_account.startswith('Income:'):
+        if self.to_account.startswith("Income:"):
             self.from_account, self.to_account = self.to_account, self.from_account
-        if self.from_account == self.to_account or self.to_account.startswith('Income:'):
-            raise ValueError('两条分录行不能表示这笔资金流向')
+        if self.from_account == self.to_account or self.to_account.startswith(
+            "Income:"
+        ):
+            raise ValueError("两条分录行不能表示这笔资金流向")
         return self
 
     @property
     def direction(self) -> Direction:
-        return flow_direction(self.from_account, self.to_account) or '转账'
+        return flow_direction(self.from_account, self.to_account) or "转账"
 
 
 ACCOUNT_FILES = {
@@ -67,6 +71,7 @@ ACCOUNT_FILES = {
         ("Assets:Cash", "现金"),
         ("Assets:WeChat:Balance", "微信"),
         ("Assets:Alipay:Balance", "支付宝"),
+        ("Assets:DebitCard:A", "银行卡A"),
     ],
     "liabilities.bean": [("Liabilities:CreditCard", "信用卡")],
     "expenses.bean": [
@@ -204,12 +209,41 @@ class Ledger:
         history: list[tuple[str, str, str]] = []
         for transaction in self.transactions:
             postings = transaction.postings
-            if len(postings) != 2 or any(p.account.startswith('Equity:') or p.units is None or p.cost or p.price for p in postings):
+            if len(postings) != 2 or any(
+                p.account.startswith("Equity:") or p.units is None or p.cost or p.price
+                for p in postings
+            ):
                 continue
-            source = next((p for p in postings if p.units and p.units.number is not None and p.units.number < 0), None)
-            target = next((p for p in postings if p.units and p.units.number is not None and p.units.number > 0), None)
-            if source and target and source.units and target.units and source.units.currency == target.units.currency:
-                history.append((transaction.payee or transaction.narration or '', source.account, target.account))
+            source = next(
+                (
+                    p
+                    for p in postings
+                    if p.units and p.units.number is not None and p.units.number < 0
+                ),
+                None,
+            )
+            target = next(
+                (
+                    p
+                    for p in postings
+                    if p.units and p.units.number is not None and p.units.number > 0
+                ),
+                None,
+            )
+            if (
+                source
+                and target
+                and source.units
+                and target.units
+                and source.units.currency == target.units.currency
+            ):
+                history.append(
+                    (
+                        transaction.payee or transaction.narration or "",
+                        source.account,
+                        target.account,
+                    )
+                )
         return history
 
     def query_transactions(
@@ -516,8 +550,8 @@ class Ledger:
         """按写入当天决定落到哪个月的文件，不能在 bootstrap 时算死。"""
         current = today or _today()
         directory = Path(str(current.year))
-        if (self.root / directory / '0-default').is_dir():
-            directory /= '0-default'
+        if (self.root / directory / "0-default").is_dir():
+            directory /= "0-default"
         return directory / f"{current.month:02d}-expenses.bean"
 
     def _insert_position(self, relative: Path) -> int:

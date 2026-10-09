@@ -1,0 +1,605 @@
+/* ---------- 对话布局 ---------- */
+.chat {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 186px minmax(0, 1fr) 372px;
+  min-height: 0;
+  background: var(--surface);
+}
+.rail {
+  border-right: 1px solid rgba(35, 30, 24, 0.1);
+  background: var(--surface-2);
+  padding: 15px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  overflow: auto;
+}
+.rail .kicker {
+  padding: 0 7px 2px;
+}
+.rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.rail-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 8px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-2);
+}
+.rail-item:hover {
+  background: var(--wash);
+}
+.rail-item.on {
+  background: var(--green-wash);
+  color: var(--ink);
+}
+.rail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 8px;
+  font: 11px var(--mono);
+  color: var(--ink-1);
+}
+.rail-row span:last-child {
+  color: var(--ink-3);
+}
+
+.convo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 30px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+}
+.turn {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: lsrise 0.25s ease;
+}
+.said {
+  display: flex;
+  justify-content: flex-end;
+}
+.said > div {
+  max-width: 76%;
+  background: var(--ink);
+  color: #f6f3ed;
+  padding: 11px 15px;
+  border-radius: 14px 14px 4px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.reply {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.reply > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reply > header i {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--green);
+  flex: none;
+}
+.reply > header b {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.reply > header small {
+  font: 10.5px var(--mono);
+  color: var(--ink-3);
+}
+.prose {
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: 62ch;
+  text-wrap: pretty;
+  white-space: pre-wrap;
+}
+.sysnote {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 12px;
+  border-radius: 99px;
+  background: var(--wash);
+  font: 10.5px var(--mono);
+  color: var(--ink-2);
+}
+
+.welcome {
+  margin: auto;
+  text-align: center;
+  color: var(--ink-2);
+  padding-bottom: 12vh;
+}
+.welcome h2 {
+  font: 30px/1.2 var(--serif);
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+/* ---------- 工具调用三层 ---------- */
+.card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raise);
+  overflow: hidden;
+}
+.card > header {
+  padding: 12px 15px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-bottom: 1px solid rgba(35, 30, 24, 0.1);
+}
+.card > header h3 {
+  font-size: 13px;
+  font-weight: 600;
+}
+.card > footer {
+  border-top: 1px solid rgba(35, 30, 24, 0.1);
+  background: var(--sunken);
+  padding: 9px 15px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.steps {
+  padding: 11px 14px;
+  display: flex;
+  flex-direction: column;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 26px;
+}
+.step > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--green);
+  flex: none;
+}
+.step.running > i {
+  background: var(--amber);
+  animation: lspulse 1.2s ease-in-out infinite;
+}
+.step.waiting {
+  opacity: 0.45;
+}
+.step.waiting > i {
+  background: transparent;
+  border: 1.5px solid rgba(35, 30, 24, 0.35);
+}
+.step .name {
+  font: 11.5px var(--mono);
+}
+.step .note {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.step .ms {
+  font: 10.5px var(--mono);
+  color: rgba(35, 30, 24, 0.32);
+}
+.stem {
+  width: 1px;
+  height: 8px;
+  background: rgba(35, 30, 24, 0.16);
+  margin-left: 3px;
+}
+
+.disclose {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  text-align: left;
+  border-top: 1px solid rgba(35, 30, 24, 0.1);
+}
+.disclose:hover {
+  background: rgba(35, 30, 24, 0.03);
+}
+.disclose .caret {
+  font: 10.5px var(--mono);
+  color: rgba(35, 30, 24, 0.45);
+}
+.disclose .label {
+  font: 11px var(--mono);
+  color: var(--ink-1);
+}
+.io {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: rgba(35, 30, 24, 0.1);
+  border-top: 1px solid rgba(35, 30, 24, 0.1);
+}
+.io > div {
+  background: var(--sunken);
+  padding: 11px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.io pre {
+  color: #3a332a;
+}
+.raw {
+  background: var(--sunken);
+  border: 1px solid rgba(35, 30, 24, 0.1);
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: #3a332a;
+}
+
+/* 结果卡 */
+.card.accent {
+  border-color: rgba(47, 111, 78, 0.3);
+}
+.card.warn {
+  border-color: rgba(138, 90, 30, 0.32);
+  background: rgba(138, 90, 30, 0.06);
+}
+.card.bad {
+  border-color: rgba(163, 58, 43, 0.3);
+  background: var(--red-wash);
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.fact > span {
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+.fact > b {
+  font-weight: 400;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fact > b.mono {
+  font-size: 11.5px;
+}
+.body {
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+/* 条形图 */
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 6px 15px 14px;
+}
+/* 分类多的时候只给固定高度，余下的交给鼠标滚动 */
+.bars.scrolly {
+  max-height: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.barrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.barrow > .lbl {
+  font: 11.5px var(--mono);
+  color: var(--ink-2);
+  width: 52px;
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 账户名太长会压到条形图上：省略号留给前缀，末级账户名始终看得见 */
+.barrow.cat > .lbl {
+  width: 186px;
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+.barrow.cat .head {
+  color: var(--ink-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.barrow.cat .leaf {
+  flex: none;
+  color: var(--ink-1);
+}
+.barrow > .track {
+  flex: 1;
+  height: 16px;
+  background: var(--wash);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.barrow > .track > i {
+  display: block;
+  height: 100%;
+  background: rgba(47, 111, 78, 0.32);
+}
+.barrow > .val {
+  font: 12px var(--mono);
+  width: 66px;
+  text-align: right;
+  flex: none;
+}
+.barrow.peak > .lbl,
+.barrow.peak > .val {
+  color: var(--ink);
+  font-weight: 500;
+}
+.barrow.peak > .track > i {
+  background: var(--green);
+}
+
+/* 预算进度 */
+.meter {
+  height: 7px;
+  border-radius: 99px;
+  background: rgba(35, 30, 24, 0.08);
+  overflow: hidden;
+}
+.meter > i {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+.meter.at-risk > i {
+  background: var(--amber);
+}
+.meter.exceeded > i {
+  background: var(--red);
+}
+.tag {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+.tag.exceeded {
+  background: var(--red);
+  color: #fbf9f5;
+}
+.tag.at-risk {
+  background: var(--amber-wash);
+  color: var(--amber-ink);
+}
+.tag.ok {
+  background: var(--green-wash);
+  color: var(--green);
+}
+
+/* ---------- 输入区 ---------- */
+.composer {
+  flex: none;
+  border-top: 1px solid rgba(35, 30, 24, 0.1);
+  padding: 12px 30px 16px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.suggest {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.suggest button {
+  font-size: 11.5px;
+  padding: 5px 10px;
+  border-radius: 99px;
+  border: 1px solid rgba(35, 30, 24, 0.14);
+  color: var(--ink-1);
+  background: var(--sunken);
+}
+.suggest button:hover {
+  background: var(--wash);
+}
+.inputbox {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--raise);
+  padding: 10px 12px;
+}
+.inputbox:focus-within {
+  outline: 2px solid rgba(47, 111, 78, 0.3);
+  outline-offset: -1px;
+}
+.inputbox textarea {
+  flex: 1;
+  resize: none;
+  border: 0;
+  background: none;
+  outline: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  max-height: 140px;
+  min-height: 21px;
+  padding: 2px 0;
+}
+.inputbox textarea::placeholder {
+  color: var(--ink-3);
+}
+.inputbox kbd {
+  font: 10.5px var(--mono);
+  color: rgba(35, 30, 24, 0.3);
+}
+
+/* ---------- 右栏 ---------- */
+.panel {
+  border-left: 1px solid rgba(35, 30, 24, 0.1);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.panel > nav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 38px;
+  flex: none;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(35, 30, 24, 0.1);
+}
+.panel > nav button {
+  padding: 0 10px;
+  height: 100%;
+  font: 9.5px var(--mono);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.panel > nav button.on {
+  color: var(--ink);
+  box-shadow: inset 0 -2px var(--green);
+}
+.panel > nav .file {
+  margin-left: auto;
+  font: 10.5px var(--mono);
+  color: var(--ink-3);
+}
+.panel > .scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pcard {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--raise);
+  overflow: hidden;
+}
+.pcard > header {
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(35, 30, 24, 0.1);
+  background: var(--sunken);
+}
+.pcard > header b {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.pcard > header small {
+  font: 10.5px var(--mono);
+  color: var(--ink-3);
+}
+.pcard > .in {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pcard pre {
+  padding: 10px 12px;
+  color: #3a332a;
+}
+.diff {
+  font: 11px/1.7 var(--mono);
+}
+.diff .ln {
+  color: rgba(35, 30, 24, 0.3);
+  display: inline-block;
+  width: 38px;
+  user-select: none;
+}
+.diff .add {
+  background: rgba(47, 111, 78, 0.1);
+  display: block;
+}
+.diff .add .sign {
+  color: var(--green);
+  font-weight: 700;
+}
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.checks > div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--ink-1);
+}
+.checks .ok {
+  color: var(--green);
+}
+.checks .warn {
+  color: var(--amber);
+}
+.plist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.plist > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font: 11px var(--mono);
+  color: var(--ink-1);
+}
