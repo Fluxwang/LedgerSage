@@ -2,6 +2,7 @@
 
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request
@@ -37,7 +38,7 @@ class Register(Login):
 
 def get_current_user(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),  # noqa: B008
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> dict:
     if not credentials:
         raise Unauthorized("请先登录")
@@ -116,6 +117,9 @@ async def login(body: Login, request: Request):
     return token(request, users[0]["id"])
 
 
+CurrentUser = Annotated[dict, Depends(get_current_user)]
+
+
 @router.get("/me")
-async def me(user: dict = Depends(get_current_user)):
+async def me(user: CurrentUser):
     return {"id": user["id"], "username": user["username"]}
