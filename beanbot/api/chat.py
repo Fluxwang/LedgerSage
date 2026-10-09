@@ -2,11 +2,11 @@
 
 import json
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from beanbot.api.auth import get_current_user
+from beanbot.api.auth import CurrentUser
 
 router = APIRouter(prefix="/chat")
 
@@ -24,7 +24,7 @@ class PendingEdit(BaseModel):
 
 @router.patch('/pending/{pending_id}')
 async def edit_pending(pending_id: str, body: PendingEdit, request: Request,
-                       user: dict = Depends(get_current_user)):
+                       user: CurrentUser):
     return request.app.state.pending.edit(user, pending_id, body.transaction_index,
                                          body.model_dump(exclude={'transaction_index'}, exclude_none=True))
 
@@ -37,7 +37,7 @@ def sse(event: dict) -> str:
 async def chat_stream(
     body: ChatRequest,
     request: Request,
-    user: dict = Depends(get_current_user),  # noqa: B008
+    user: CurrentUser,
 ):
     async def events():
         try:
@@ -57,7 +57,7 @@ async def chat_stream(
 async def confirm_pending(
     pending_id: str,
     request: Request,
-    user: dict = Depends(get_current_user),  # noqa: B008
+    user: CurrentUser,
 ):
     """把 Agent 产出的 diff 真正写进账本（ADR 0012）。"""
     return await request.app.state.pending.confirm(user, pending_id)
@@ -67,6 +67,6 @@ async def confirm_pending(
 async def reject_pending(
     pending_id: str,
     request: Request,
-    user: dict = Depends(get_current_user),  # noqa: B008
+    user: CurrentUser,
 ):
     return request.app.state.pending.reject(user, pending_id)

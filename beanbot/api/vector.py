@@ -1,24 +1,24 @@
 """当前用户向量索引的维护端点。"""
 
-from fastapi import APIRouter, Depends, Request
-from beanbot.api.auth import get_current_user
+from fastapi import APIRouter, Request
+from beanbot.api.auth import CurrentUser
 
 
 router = APIRouter(prefix="/admin/vector")
 
 
 @router.post("/rebuild")
-async def rebuild(request: Request, user: dict = Depends(get_current_user)):
+async def rebuild(request: Request, user: CurrentUser):
     return request.app.state.vectors.rebuild_in_background(user)
 
 
 @router.post("/rebuild/cancel")
-async def cancel(request: Request, user: dict = Depends(get_current_user)):
+async def cancel(request: Request, user: CurrentUser):
     return request.app.state.vectors.cancel_rebuild(user["id"])
 
 
 @router.get("/status")
-async def status(request: Request, user: dict = Depends(get_current_user)):
+async def status(request: Request, user: CurrentUser):
     vectors = request.app.state.vectors
     enabled = request.app.state.settings.embedding_enabled
     result = vectors.status(user["id"])

@@ -4,10 +4,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import Field
 
-from beanbot.api.auth import get_current_user
+from beanbot.api.auth import CurrentUser
 from beanbot.gateways.ledger import Ledger, period_bounds
 
 router = APIRouter()
@@ -55,7 +55,7 @@ def trend_months(today: date, count: int = TREND_MONTHS) -> list[date]:
 
 @router.get("/accounts")
 async def accounts(
-    request: Request, prefix: str = "", user: dict = Depends(get_current_user)
+    request: Request, user: CurrentUser, prefix: str = ""
 ):
     return [
         {"account": account, "display_name": display_name}
@@ -65,7 +65,7 @@ async def accounts(
 
 
 @router.post("/transactions/{commit}/undo")
-async def undo(commit: str, request: Request, user: dict = Depends(get_current_user)):
+async def undo(commit: str, request: Request, user: CurrentUser):
     """撤销一次 BeanChat 提交——记账、预算、删除都走这一条（ADR 0013）。"""
     return await user_ledger(request, user).undo(commit)
 
@@ -73,6 +73,7 @@ async def undo(commit: str, request: Request, user: dict = Depends(get_current_u
 @router.get("/transactions")
 async def transactions(
     request: Request,
+    user: CurrentUser,
     start: Annotated[date | None, Query()] = None,
     end: Annotated[date | None, Query()] = None,
     account: Annotated[str, Query()] = "",
@@ -80,7 +81,6 @@ async def transactions(
     payee: Annotated[str, Query()] = "",
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=200)] = TRANSACTIONS_PAGE_SIZE,
-    user: dict = Depends(get_current_user),
 ):
     """流水页：服务端筛选与分页，每笔带可寻址的 id。"""
     ledger = user_ledger(request, user)
@@ -107,7 +107,7 @@ async def transactions(
 
 @router.get("/transactions/{transaction_id}/raw")
 async def transaction_raw(
-    transaction_id: str, request: Request, user: dict = Depends(get_current_user)
+    transaction_id: str, request: Request, user: CurrentUser
 ):
     """删除确认弹窗要展示的账本原文。"""
     return user_ledger(request, user).transaction_source(transaction_id)
@@ -115,7 +115,7 @@ async def transaction_raw(
 
 @router.delete("/transactions/{transaction_id}")
 async def delete_transaction(
-    transaction_id: str, request: Request, user: dict = Depends(get_current_user)
+    transaction_id: str, request: Request, user: CurrentUser
 ):
     """从账本原文里移除整笔交易；返回的 commit 可以喂给 undo（ADR 0013）。"""
     return await user_ledger(request, user).delete(transaction_id)
@@ -124,10 +124,10 @@ async def delete_transaction(
 @router.get("/dashboard")
 async def dashboard(
     request: Request,
+    user: CurrentUser,
     period: Annotated[str, Query()] = "this_month",
     # page: int = Query(1, ge=1),
     page: Annotated[int, Query(ge=1)] = 1,
-    user: dict = Depends(get_current_user),
 ):
     ledger = user_ledger(request, user)
     today = date.today()

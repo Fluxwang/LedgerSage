@@ -19,10 +19,16 @@ def main():
     serve.add_argument("--port", default=8000, type=int)
     invite = commands.add_parser(name="invite", help="生成邀请码")
     invite.add_argument("--count", type=int, default=1)
-    migrate = commands.add_parser(name="migrate-account-names", aliases=['migrate_account_names'], help="迁移账户显示名")
+    migrate = commands.add_parser(
+        name="migrate-account-names",
+        aliases=["migrate_account_names"],
+        help="迁移账户显示名",
+    )
     migrate.add_argument("ledger", type=Path)
-    migrate.add_argument('--names', type=Path, help='已确认的账户显示名 JSON')
-    migrate.add_argument('--apply', action='store_true', help='执行迁移并单独提交；默认只预览')
+    migrate.add_argument("--names", type=Path, help="已确认的账户显示名 JSON")
+    migrate.add_argument(
+        "--apply", action="store_true", help="执行迁移并单独提交；默认只预览"
+    )
 
     # bean-format 不再是运行时依赖，只作为可选的人工维护命令保留（ADR-0002）。
     format_command = commands.add_parser(
@@ -49,9 +55,11 @@ def main():
             code = secrets.token_urlsafe(18)
             database.invite(code)
             print(code)
-    elif args.command in ('migrate-account-names', 'migrate_account_names'):
+    elif args.command in ("migrate-account-names", "migrate_account_names"):
         names = json.loads(args.names.read_text()) if args.names else None
-        for item in migrate_account_names(args.ledger, names, dry_run=not args.apply, commit=args.apply):
+        for item in migrate_account_names(
+            args.ledger, names, dry_run=not args.apply, commit=args.apply
+        ):
             print(item)
     elif args.command == "format":
         target: Path = args.ledger
