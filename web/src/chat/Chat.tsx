@@ -1,3 +1,4 @@
+import "./chat.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { clearToken, type Dashboard, token } from "../api";
 import { abs, num } from "../ui";

@@ -1,3 +1,4 @@
+import "./explore.css";
 import { useState } from "react";
 import type { Dashboard } from "../api";
 import { Picker } from "../ui";

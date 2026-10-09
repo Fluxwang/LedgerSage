@@ -1,10 +1,11 @@
+import "./styles/base.css";
+import "./styles/login.css";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { auth, clearToken, type Dashboard, dashboard as fetchDashboard, setToken, token, vector as vectorApi } from "./api";
 import { Chat } from "./chat/Chat";
 import { Explore } from "./explore/Explore";
 import { num } from "./ui";
-import "./styles.css";
 
 type View = "chat" | "explore";
 
