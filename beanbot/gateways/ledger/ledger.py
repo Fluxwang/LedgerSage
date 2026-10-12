@@ -1,178 +1,30 @@
-"""按用户隔离的 Beancount 账本与安全写入原语。"""
+"""Ledger：单本账本的读取、预览与串行写入。"""
 
 from __future__ import annotations
 
 import asyncio
-import base64
-import binascii
-import datetime
 import hashlib
 import re
 import subprocess
 from collections import OrderedDict
 from collections.abc import Callable, Iterable
-from datetime import date, timedelta
-from zoneinfo import ZoneInfo
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 from beancount import loader
 from beancount.core import data
 from beancount.core.amount import Amount
 from beancount.core.number import D
 from beancount.parser.printer import EntryPrinter
-from pydantic import BaseModel, Field, model_validator
 
 from beanbot.config import Settings
 from beanbot.exceptions import AccountNotFound, LedgerWriteConflict, NotFound
-
-
-Direction = Literal["支出", "收入", "转账"]
-
-
-def flow_direction(
-    from_account: str | None, to_account: str | None
-) -> Direction | None:
-    """由两条分录行的账户前缀推导方向；两侧都定不下来时返回 None（ADR 0014）。"""
-    if (to_account or "").startswith("Expenses:"):
-        return "支出"
-    if (from_account or "").startswith("Income:"):
-        return "收入"
-    return "转账" if from_account and to_account else None
-
-
-class TransactionInput(BaseModel):
-    amount: Decimal = Field(gt=0)
-    date: date
-    payee: str = Field(min_length=1)
-    narration: str = ""
-    from_account: str = Field(min_length=1)
-    to_account: str = Field(min_length=1)
-    tags: set[str] = Field(default_factory=set)
-
-    @model_validator(mode="after")
-    def normalize_flow(self):
-        if self.to_account.startswith("Income:"):
-            self.from_account, self.to_account = self.to_account, self.from_account
-        if self.from_account == self.to_account or self.to_account.startswith(
-            "Income:"
-        ):
-            raise ValueError("两条分录行不能表示这笔资金流向")
-        return self
-
-    @property
-    def direction(self) -> Direction:
-        return flow_direction(self.from_account, self.to_account) or "转账"
-
-
-ACCOUNT_FILES = {
-    "assets.bean": [
-        ("Assets:Cash", "现金"),
-        ("Assets:WeChat:Balance", "微信"),
-        ("Assets:Alipay:Balance", "支付宝"),
-        ("Assets:DebitCard:A", "银行卡A"),
-    ],
-    "liabilities.bean": [("Liabilities:CreditCard", "信用卡")],
-    "expenses.bean": [
-        ("Expenses:Food:Dining", "餐饮"),
-        ("Expenses:Transport", "交通"),
-        ("Expenses:Other", "其他支出"),
-    ],
-    "income.bean": [("Income:Salary", "工资")],
-    "equity.bean": [("Equity:Opening-Balances", "期初余额")],
-}
-
-
-BUDGET_PERIODS = ("weekly", "monthly", "yearly")
-
-# 交易 id = base64url("<相对路径>:<行号>:<摘要>")。摘要是规范渲染文本的 SHA-256 前八位，
-# 用来在删除前确认「这一行还是我当初看到的那一笔」。详见 ADR 0013。
-ID_SEPARATOR = ":"
-
-
-def encode_transaction_id(relative: str, lineno: int, digest: str) -> str:
-    raw = f"{relative}{ID_SEPARATOR}{lineno}{ID_SEPARATOR}{digest}".encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
-
-
-def decode_transaction_id(transaction_id: str) -> tuple[str, int, str]:
-    padded = transaction_id + "=" * (-len(transaction_id) % 4)
-    try:
-        relative, lineno, digest = (
-            base64.urlsafe_b64decode(padded).decode().rsplit(ID_SEPARATOR, 2)
-        )
-        return relative, int(lineno), digest
-    except (binascii.Error, UnicodeDecodeError, ValueError) as exc:
-        raise NotFound("交易 id 不合法") from exc
-
-
-def _today() -> date:
-    return date.today()
-
-
-def period_bounds(period: str, today: date | None = None) -> tuple[date, date]:
-    """把页面时间范围（this_week/this_month/this_year）或预算周期（weekly/monthly/yearly）换算成闭区间。"""
-    today = today or datetime.datetime.now(ZoneInfo("Asia/Shanghai")).date()
-    if period in ("this_week", "weekly"):
-        return today - timedelta(days=today.weekday()), today
-    if period in ("this_year", "yearly"):
-        return date(today.year, 1, 1), today
-    return today.replace(day=1), today
-
-
-def _git(root: Path, *args: str) -> str:
-    completed = subprocess.run(
-        ["git", "-C", str(root), *args],
-        check=True,
-        text=True,
-        # stdout=subprocess.PIPE,
-        # stderr=subprocess.PIPE,
-        capture_output=True,
-    )
-    return completed.stdout.strip()
-
-
-def scaffold_ledger(root: Path, today: date | None = None) -> None:
-    """生成可立即使用、可审计的最小账本。"""
-    today = today or date.today()
-    root.mkdir(parents=True, exist_ok=True)
-    (root / "accounts").mkdir(exist_ok=True)
-    (root / str(today.year)).mkdir(exist_ok=True)
-    main = (
-        'option "title" "BeanChat Ledger"\n'
-        'option "operating_currency" "CNY"\n'
-        'include "accounts/*.bean"\n'
-        'include "budgets.bean"\n'
-        'include "20*/*.bean"\n'
-    )
-    (root / "main.bean").write_text(main, encoding="utf-8")
-    opened_on = date(1970, 1, 1)
-    for filename, accounts in ACCOUNT_FILES.items():
-        body = "".join(
-            f'{opened_on.isoformat()} open {account}\n  name: "{display_name}"\n\n'
-            for account, display_name in accounts
-        )
-        (root / "accounts" / filename).write_text(body, encoding="utf-8")
-    (root / "budgets.bean").write_text("", encoding="utf-8")
-    # 向量索引跟着账本走，但它是派生数据，不进版本库（票 21）。
-    (root / ".gitignore").write_text("vector.sqlite\n", encoding="utf-8")
-    initial_transactions = Path(str(today.year)) / f"{today.month:02d}-expenses.bean"
-    (root / initial_transactions).write_text("", encoding="utf-8")
-    if not (root / ".git").is_dir():
-        _git(root, "init", "-q")
-    _git(root, "config", "user.name", "BeanChat Agent")
-    _git(root, "config", "user.email", "agent@beanchat.local")
-    _git(
-        root,
-        "add",
-        "main.bean",
-        "accounts",
-        "budgets.bean",
-        ".gitignore",
-        initial_transactions.as_posix(),
-    )
-    _git(root, "commit", "-q", "-m", "BeanChat: initialize ledger")
+from beanbot.gateways.ledger.ids import decode_transaction_id, encode_transaction_id
+from beanbot.gateways.ledger.inputs import TransactionInput
+from beanbot.gateways.ledger.periods import BUDGET_PERIODS, period_bounds, today as _today
+from beanbot.gateways.ledger.repo import commit_only, git, init_repo, scaffold_ledger
 
 
 class Ledger:
@@ -652,20 +504,12 @@ class Ledger:
             kept = re.sub(r"\n{3,}", "\n\n", kept).strip("\n")
             try:
                 path.write_text(kept + "\n" if kept else "", encoding="utf-8")
-                await asyncio.to_thread(_git, self.root, "add", relative)
-                await asyncio.to_thread(
-                    _git,
+                commit = await commit_only(
                     self.root,
-                    "commit",
-                    "-q",
-                    "--only",
-                    "-m",
                     f"BeanChat: delete transaction {entry.date.isoformat()} "
                     f"{entry.payee or entry.narration}",
-                    "--",
                     relative,
                 )
-                commit = await asyncio.to_thread(self._git_head)
             except (OSError, subprocess.CalledProcessError) as exc:
                 path.write_text(original, encoding="utf-8")
                 raise LedgerWriteConflict(f"删除失败：{exc}") from exc
@@ -676,9 +520,6 @@ class Ledger:
                 "removed_lines": end - start,
                 "text": removed,
             }
-
-    def _git_head(self) -> str:
-        return _git(self.root, "rev-parse", "HEAD")
 
     def render_entry(self, entry: data.Directive) -> str:
         """把账本里已有的分录渲染回规范文本。"""
@@ -741,19 +582,11 @@ class Ledger:
             try:
                 with target.open("a", encoding="utf-8") as stream:
                     stream.write(prefix + "\n\n".join(rendered) + "\n")
-                await asyncio.to_thread(_git, self.root, "add", relative.as_posix())
-                await asyncio.to_thread(
-                    _git,
+                commit = await commit_only(
                     self.root,
-                    "commit",
-                    "-q",
-                    "--only",
-                    "-m",
                     f"BeanChat: record {len(batch)} transaction(s)",
-                    "--",
                     relative.as_posix(),
                 )
-                commit = await asyncio.to_thread(_git, self.root, "rev-parse", "HEAD")
             except (OSError, subprocess.CalledProcessError) as exc:
                 if target.exists():
                     with target.open("r+b") as stream:
@@ -777,10 +610,10 @@ class Ledger:
         async with self._lock:
             try:
                 resolved = await asyncio.to_thread(
-                    _git, self.root, "rev-parse", "--verify", f"{commit}^{{commit}}"
+                    git, self.root, "rev-parse", "--verify", f"{commit}^{{commit}}"
                 )
                 subject = await asyncio.to_thread(
-                    _git, self.root, "show", "-s", "--format=%s", resolved
+                    git, self.root, "show", "-s", "--format=%s", resolved
                 )
                 if not subject.startswith(
                     ("BeanChat: record", "BeanChat: set budget", "BeanChat: delete")
@@ -788,7 +621,7 @@ class Ledger:
                     raise LedgerWriteConflict("只能撤销 BeanChat 创建的提交")
                 changed = (
                     await asyncio.to_thread(
-                        _git,
+                        git,
                         self.root,
                         "diff-tree",
                         "--no-commit-id",
@@ -798,10 +631,10 @@ class Ledger:
                     )
                 ).splitlines()
                 await asyncio.to_thread(
-                    _git, self.root, "revert", "--no-commit", resolved
+                    git, self.root, "revert", "--no-commit", resolved
                 )
                 await asyncio.to_thread(
-                    _git,
+                    git,
                     self.root,
                     "commit",
                     "-q",
@@ -843,19 +676,9 @@ class Ledger:
             with target.open("a", encoding="utf-8") as stream:
                 stream.write(("\n" if before else "") + line)
             try:
-                await asyncio.to_thread(_git, self.root, "add", "budgets.bean")
-                await asyncio.to_thread(
-                    _git,
-                    self.root,
-                    "commit",
-                    "-q",
-                    "--only",
-                    "-m",
-                    f"BeanChat: set budget for {account}",
-                    "--",
-                    "budgets.bean",
+                commit = await commit_only(
+                    self.root, f"BeanChat: set budget for {account}", "budgets.bean"
                 )
-                commit = await asyncio.to_thread(_git, self.root, "rev-parse", "HEAD")
             except subprocess.CalledProcessError as exc:
                 with target.open("r+b") as stream:
                     stream.truncate(before)
@@ -880,9 +703,7 @@ class LedgerFactory:
             if not (root / "main.bean").is_file():
                 raise LedgerWriteConflict("接管路径缺少 main.bean")
             if not (root / ".git").is_dir():
-                _git(root, "init", "-q")
-                _git(root, "config", "user.name", "BeanChat Agent")
-                _git(root, "config", "user.email", "agent@beanchat.local")
+                init_repo(root)
         elif not (root / "main.bean").exists():
             scaffold_ledger(root)
         ledger = Ledger(root, user_id)
