@@ -1,127 +1,15 @@
 import "./styles/base.css";
-import "./styles/login.css";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { auth, clearToken, type Dashboard, dashboard as fetchDashboard, setToken, token, vector as vectorApi } from "./api";
+import { auth, clearToken, type Dashboard, dashboard as fetchDashboard, token } from "./api";
 import { Chat } from "./chat/Chat";
 import { Explore } from "./explore/Explore";
+import { Login } from "./shell/Login";
+import { UserMenu } from "./shell/UserMenu";
+import { VectorButton } from "./shell/VectorButton";
 import { num } from "./ui";
 
 type View = "chat" | "explore";
-
-function Login({ onLogin }: { onLogin: () => void }) {
-  const [register, setRegister] = useState(false);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setBusy(true);
-    const form = Object.fromEntries(new FormData(event.currentTarget)) as any;
-    try {
-      const result = register ? await auth.register(form) : await auth.login(form);
-      setToken(result.access_token);
-      onLogin();
-    } catch (reason) {
-      setError(String((reason as Error).message));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <main className="login">
-      <form onSubmit={submit}>
-        <div className="mark" />
-        <h1>LedgerSage</h1>
-        <div className="tag">让每一笔，都有清楚的来处。</div>
-        <label>
-          用户名
-          <input name="username" autoComplete="username" required />
-        </label>
-        <label>
-          密码
-          <input name="password" type="password" minLength={8} required />
-        </label>
-        {register && (
-          <label>
-            邀请码
-            <input name="invite_code" required />
-          </label>
-        )}
-        <button className="btn primary" disabled={busy}>
-          {register ? "创建账户" : "登录"}
-        </button>
-        {error && <div className="err">{error}</div>}
-        <button type="button" className="btn ghost" style={{ width: "100%", justifyContent: "center", marginTop: 12 }} onClick={() => setRegister(!register)}>
-          {register ? "已有账户，去登录" : "使用邀请码注册"}
-        </button>
-      </form>
-    </main>
-  );
-}
-
-function UserMenu({ username, onExplore, onLogout }: { username: string; onExplore: () => void; onLogout: () => void }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (!box.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [open]);
-  return (
-    <div className="usermenu" ref={box}>
-      <button onClick={() => setOpen(!open)}>
-        <span className="avatar">{username.slice(0, 1).toUpperCase() || "?"}</span>
-        <span style={{ fontSize: 12.5 }}>{username}</span>
-        <span style={{ fontSize: 10, color: "var(--ink-3)" }}>{open ? "▴" : "▾"}</span>
-      </button>
-      {open && (
-        <div className="menu">
-          <button disabled title="设置页不在当前范围" style={{ opacity: 0.45, cursor: "not-allowed" }}>
-            设置
-          </button>
-          <button onClick={() => { setOpen(false); onExplore(); }}>统计页面</button>
-          <button onClick={onLogout}>退出登录</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function VectorButton() {
-  const [state, setState] = useState<any>();
-  useEffect(() => {
-    vectorApi.status().then(setState).catch(() => {});
-  }, []);
-  // 全量重建在后台跑，轮询到结束为止，让用户看得到进度。
-  useEffect(() => {
-    if (state?.status !== "running") return;
-    const timer = setInterval(() => vectorApi.status().then(setState).catch(() => {}), 2000);
-    return () => clearInterval(timer);
-  }, [state?.status]);
-  if (!state?.enabled || !(state.empty || state.status === "running" || state.status === "failed")) return null;
-  return (
-    <button
-      className="btn sm"
-      disabled={state.status === "running"}
-      onClick={async () => {
-        setState({ ...state, status: "running", completed: 0, total: 0 });
-        await vectorApi.rebuild();
-      }}
-    >
-      {state.status === "running"
-        ? `索引中 ${state.completed}/${state.total || "…"}`
-        : state.status === "failed"
-          ? "索引失败，重试"
-          : "建立历史索引"}
-    </button>
-  );
-}
 
 function App() {
   const [authed, setAuthed] = useState(Boolean(token()));
