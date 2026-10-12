@@ -15,7 +15,7 @@ A pre-existing write-destination mismatch was fixed because it prevented this ve
 Live migration command, after approval and a clean worktree:
 
 ```sh
-.venv/bin/python -m beanbot migrate-account-names Beancount --names .scratch/ledgersage-income/account-names.json --apply
+.venv/bin/python -m beanbot migrate-account-names Beancount --names docs/archive/ledgersage-income/account-names.json --apply
 ```
 
 ## 两轴评审与收尾（2026-09-19）
@@ -34,7 +34,7 @@ Live migration command, after approval and a clean worktree:
 
 ```sh
 .venv/bin/python -m beanbot migrate-account-names data/ledgers/d2e206403a0f438699d2d2153d218729 \
-  --names .scratch/ledgersage-income/account-names.json --apply
+  --names docs/archive/ledgersage-income/account-names.json --apply
 ```
 
 结果：账本加载 0 错误，账户总数仍是 106，交易 1234 笔不变，**106 个账户全部带上 `name:` meta**（此前是 0 个）。被整行注释掉的 `open` 行（如 `; open Assets:Cash HKD`）没有被碰。改动在账本仓库中单独成一次提交 `615f5a4`，迁移后工作区干净。

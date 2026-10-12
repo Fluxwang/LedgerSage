@@ -17,4 +17,4 @@ The application reads environment variables through `beanbot/config.py`; never p
 
 Repositories and vector indexes are resolved per user through factories. Never introduce a process-global ledger. Writes are append-only, stage one exact file, and run behind a per-ledger lock. The service must use one Uvicorn worker.
 
-Tests live in top-level `tests/`; the real-LLM classification evaluator under `tests/eval/` is a manual tool and does not run in pytest. Specs and tickets live under `.scratch/`. Domain terms are in `CONTEXT.md`, and architecture decisions are in `docs/adr/`.
+Tests live in top-level `tests/`; the real-LLM classification evaluator under `tests/eval/` is a manual tool and does not run in pytest. Specs and tickets for in-flight work live under `.scratch/`; finished features are archived in `docs/archive/`. Domain terms are in `CONTEXT.md`, and architecture decisions are in `docs/adr/`.
