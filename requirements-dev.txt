@@ -1,0 +1,7 @@
+-r requirements.txt
+pytest>=8,<10
+pytest-asyncio>=1,<2
+mypy>=1.15,<2
+types-python-dateutil
+types-python-jose
+types-passlib
