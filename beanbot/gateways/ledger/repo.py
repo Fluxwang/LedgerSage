@@ -35,8 +35,8 @@ def git(root: Path, *args: str) -> str:
 def init_repo(root: Path) -> None:
     if not (root / ".git").is_dir():
         git(root, "init", "-q")
-    git(root, "config", "user.name", "BeanChat Agent")
-    git(root, "config", "user.email", "agent@beanchat.local")
+    git(root, "config", "user.name", "LedgerSage Agent")
+    git(root, "config", "user.email", "agent@ledgersage.local")
 
 
 async def commit_only(root: Path, message: str, *paths: str) -> str:
@@ -55,7 +55,7 @@ def scaffold_ledger(root: Path, today: date | None = None) -> None:
     (root / "accounts").mkdir(exist_ok=True)
     (root / str(today.year)).mkdir(exist_ok=True)
     main = (
-        'option "title" "BeanChat Ledger"\n'
+        'option "title" "LedgerSage Ledger"\n'
         'option "operating_currency" "CNY"\n'
         'include "accounts/*.bean"\n'
         'include "budgets.bean"\n'
@@ -84,4 +84,4 @@ def scaffold_ledger(root: Path, today: date | None = None) -> None:
         ".gitignore",
         initial_transactions.as_posix(),
     )
-    git(root, "commit", "-q", "-m", "BeanChat: initialize ledger")
+    git(root, "commit", "-q", "-m", "LedgerSage: initialize ledger")

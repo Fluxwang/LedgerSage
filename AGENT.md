@@ -1,6 +1,6 @@
-# BeanChat repository guide
+# LedgerSage repository guide
 
-BeanChat is a multi-user conversational bookkeeping web app. Comments, docstrings, and user-facing text should normally be Chinese.
+LedgerSage is a multi-user conversational bookkeeping web app. Comments, docstrings, and user-facing text should normally be Chinese.
 
 ## Commands
 

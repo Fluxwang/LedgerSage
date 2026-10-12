@@ -27,7 +27,7 @@ def create_app(
     settings: Settings | None = None, agent_model: AgentModel | None = None
 ) -> FastAPI:
     settings = settings or Settings()  # type: ignore[call-arg]  # values come from environment
-    app = FastAPI(title="BeanChat")
+    app = FastAPI(title="LedgerSage")
     app.state.settings = settings
     app.state.db = Database(settings.database_path)
     app.state.ledgers = LedgerFactory(settings)

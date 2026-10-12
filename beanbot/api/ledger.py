@@ -66,7 +66,7 @@ async def accounts(
 
 @router.post("/transactions/{commit}/undo")
 async def undo(commit: str, request: Request, user: CurrentUser):
-    """撤销一次 BeanChat 提交——记账、预算、删除都走这一条（ADR 0013）。"""
+    """撤销一次 LedgerSage 提交——记账、预算、删除都走这一条（ADR 0013）。"""
     return await user_ledger(request, user).undo(commit)
 
 
