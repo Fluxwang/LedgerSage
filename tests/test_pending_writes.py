@@ -74,7 +74,9 @@ async def test_preview_renders_the_diff_without_touching_the_ledger(tmp_path):
     assert preview['added_lines'][0] == '2026-09-09 * "火锅店" "午饭"'
     assert [check['level'] for check in preview['validations']] == ['ok', 'ok']
     assert ledger.transactions == []
-    assert (ledger.root / '2026' / '09-expenses.bean').read_text() == ''
+    # 账本按当天月份初始化，九月的文件可能根本不存在；无论哪种情况都不能被写入内容。
+    target = ledger.root / '2026' / '09-expenses.bean'
+    assert not target.exists() or target.read_text() == ''
 
 
 async def test_preview_flags_a_same_day_same_payee_same_amount_duplicate(tmp_path):

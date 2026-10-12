@@ -107,7 +107,7 @@ async def test_ambiguous_account_answer_asks_again_without_losing_other_side(tmp
     ambiguous = [event async for event in service.stream(user, 'ambiguous', 'Assets:')]
     assert ambiguous[-1]['type'] == 'ask'
     assert '多个' in ambiguous[-1]['question']
-    assert set(ambiguous[-1]['candidates']) == {'现金', '微信', '支付宝'}
+    assert set(ambiguous[-1]['candidates']) == {'现金', '微信', '支付宝', '银行卡A'}
     missed = [event async for event in service.stream(user, 'ambiguous', '不存在')]
     assert '没有匹配' in missed[-1]['question']
     final = [event async for event in service.stream(user, 'ambiguous', '微信')]

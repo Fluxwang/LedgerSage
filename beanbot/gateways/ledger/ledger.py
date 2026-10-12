@@ -506,7 +506,7 @@ class Ledger:
                 path.write_text(kept + "\n" if kept else "", encoding="utf-8")
                 commit = await commit_only(
                     self.root,
-                    f"BeanChat: delete transaction {entry.date.isoformat()} "
+                    f"LedgerSage: delete transaction {entry.date.isoformat()} "
                     f"{entry.payee or entry.narration}",
                     relative,
                 )
@@ -584,7 +584,7 @@ class Ledger:
                     stream.write(prefix + "\n\n".join(rendered) + "\n")
                 commit = await commit_only(
                     self.root,
-                    f"BeanChat: record {len(batch)} transaction(s)",
+                    f"LedgerSage: record {len(batch)} transaction(s)",
                     relative.as_posix(),
                 )
             except (OSError, subprocess.CalledProcessError) as exc:
@@ -615,10 +615,15 @@ class Ledger:
                 subject = await asyncio.to_thread(
                     git, self.root, "show", "-s", "--format=%s", resolved
                 )
+                # 改名前的账本里还留着 BeanChat 前缀的提交，同样允许撤销。
                 if not subject.startswith(
-                    ("BeanChat: record", "BeanChat: set budget", "BeanChat: delete")
+                    tuple(
+                        f"{name}: {action}"
+                        for name in ("LedgerSage", "BeanChat")
+                        for action in ("record", "set budget", "delete")
+                    )
                 ):
-                    raise LedgerWriteConflict("只能撤销 BeanChat 创建的提交")
+                    raise LedgerWriteConflict("只能撤销 LedgerSage 创建的提交")
                 changed = (
                     await asyncio.to_thread(
                         git,
@@ -640,7 +645,7 @@ class Ledger:
                     "-q",
                     "--only",
                     "-m",
-                    f"BeanChat: undo {resolved[:12]}",
+                    f"LedgerSage: undo {resolved[:12]}",
                     "--",
                     *changed,
                 )
@@ -677,7 +682,7 @@ class Ledger:
                 stream.write(("\n" if before else "") + line)
             try:
                 commit = await commit_only(
-                    self.root, f"BeanChat: set budget for {account}", "budgets.bean"
+                    self.root, f"LedgerSage: set budget for {account}", "budgets.bean"
                 )
             except subprocess.CalledProcessError as exc:
                 with target.open("r+b") as stream:

@@ -1,6 +1,6 @@
-# BeanChat / LedgerSage
+# LedgerSage
 
-BeanChat 把自然语言消息转成可审计的 Beancount 分录。系统支持多用户、每用户一本隔离账本、追问、固定只读查询工具、预算、实时决策轨迹、仪表盘和运行历史。
+LedgerSage 把自然语言消息转成可审计的 Beancount 分录。系统支持多用户、每用户一本隔离账本、追问、固定只读查询工具、预算、实时决策轨迹、仪表盘和运行历史。
 
 账本文件始终是账务数据的唯一真源。SQLite 只保存用户、对话、LangGraph checkpoint 和决策轨迹。
 

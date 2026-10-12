@@ -68,7 +68,7 @@ docs/*
 
 ./Beancount/
 
-# BeanChat runtime and frontend dependencies
+# LedgerSage runtime and frontend dependencies
 data/
 ledgers/
 node_modules/

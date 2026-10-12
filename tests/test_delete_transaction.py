@@ -42,7 +42,7 @@ async def test_delete_removes_the_entry_and_leaves_the_rest_parseable(tmp_path):
     assert '二号' not in body
     assert '\n\n\n' not in body and body.endswith('\n')
     assert not loader.load_file(str(ledger.root / 'main.bean'))[1]
-    assert git(ledger.root, 'show', '-s', '--format=%s', receipt['commit']).startswith('BeanChat: delete')
+    assert git(ledger.root, 'show', '-s', '--format=%s', receipt['commit']).startswith('LedgerSage: delete')
 
 
 async def test_deleting_the_only_transaction_leaves_an_empty_file(tmp_path):

@@ -58,7 +58,7 @@ def migrate_account_names(root: Path, names: dict[str, str] | None = None, *,
             raise RuntimeError(f'迁移后账本校验失败：{errors[:1]}')
         if commit:
             subprocess.run(['git', '-C', str(root), 'commit', '--only', '-m',
-                            'BeanChat: migrate account display names', '--',
+                            'LedgerSage: migrate account display names', '--',
                             *(str(path.relative_to(root)) for path in replacements)], check=True, capture_output=True)
     except Exception:
         for path in replacements:

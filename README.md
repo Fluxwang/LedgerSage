@@ -1,6 +1,6 @@
-# BeanChat / LedgerSage
+# LedgerSage
 
-BeanChat turns natural-language messages into auditable Beancount entries. It supports multiple users, one isolated git-backed ledger per user, clarifying questions, fixed read-only query tools, budgets, live decision traces, dashboards, and run history.
+LedgerSage turns natural-language messages into auditable Beancount entries. It supports multiple users, one isolated git-backed ledger per user, clarifying questions, fixed read-only query tools, budgets, live decision traces, dashboards, and run history.
 
 Ledger files remain the only source of truth for financial data. SQLite stores users, sessions, LangGraph checkpoints, and decision traces.
 

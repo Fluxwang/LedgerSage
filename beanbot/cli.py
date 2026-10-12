@@ -12,7 +12,7 @@ from beanbot.storage.database import Database
 
 
 def main():
-    parser = argparse.ArgumentParser(description="BeanChat 对话式记账服务")
+    parser = argparse.ArgumentParser(description="LedgerSage 对话式记账服务")
     commands = parser.add_subparsers(dest="command", required=True)
     serve = commands.add_parser(name="serve", help="启动 Web 服务")
     serve.add_argument("--host", default="0.0.0.0")
