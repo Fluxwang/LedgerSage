@@ -3,7 +3,7 @@
  *
  * 设计稿要求的数据里有一部分后端还没有对应端点：这些函数一律走 `pending()`，
  * 抛出 `MissingEndpoint`，由界面渲染成「待接口」占位而不是假数据。
- * 完整清单见 .scratch/ledgersage-frontend/missing-endpoints.md。
+ * 完整清单见 docs/archive/ledgersage-frontend/missing-endpoints.md。
  */
 
 const TOKEN_KEY = "beanchat_token";
@@ -75,6 +75,7 @@ export type Dashboard = {
   accounts: Card[];
   monthly_trend: { month: string; amount: string }[];
   categories: { account: string; display_name: string; amount: string }[];
+  top_payees: { payee: string; amount: string }[];
   recent: { rows: Row[]; page: number; size: number; total: number };
   budgets: Budget[];
   period: { start: string; end: string; name: string };
@@ -111,17 +112,13 @@ export const vector = {
 /* ---------------------------------------------------------------- 待补端点 */
 
 export type LedgerStatus = {
-  file: string;
-  currency: string;
-  transaction_count: number;
-  bean_check: { ok: boolean; message: string };
-  git: { clean: boolean; synced_at: string | null };
-  health: { level: "ok" | "warn"; text: string }[];
+  bean_check: { ok: boolean; error_count: number; message: string };
+  git: { clean: boolean; last_commit_at: string | null };
+  health: { key: "bean_check" | "working_tree" | "missing_payee"; level: "ok" | "warn"; text: string }[];
 };
 
-/** 顶栏的账本路径 / bean-check / git 状态，以及右栏「账本健康度」。 */
-export const ledgerStatus = (): Promise<LedgerStatus> =>
-  pending("GET /ledger/status", "顶栏与右栏需要账本文件名、笔数、bean-check 与 git 同步状态");
+/** 顶栏与右栏共用的账本健康度，独立于仪表盘和统计区间。 */
+export const ledgerStatus = () => api<LedgerStatus>("/ledger/status");
 
 export type LedgerSlice = { file: string; start_line: number; lines: string[] };
 
@@ -236,9 +233,6 @@ export const deleteTransaction = (id: string) =>
     `/transactions/${id}`,
     { method: "DELETE" },
   );
-
-export const topPayees = (_params: { start: string; end: string; limit: number }): Promise<{ payee: string; amount: string }[]> =>
-  pending("GET /analytics/top-payees", "右栏「前十收款方」没有对应聚合");
 
 export type SavedQuery = { id: string; title: string; params: Record<string, unknown> };
 

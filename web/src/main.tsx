@@ -1,13 +1,14 @@
 import "./styles/base.css";
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { auth, clearToken, type Dashboard, dashboard as fetchDashboard, token } from "./api";
+import { auth, clearToken, type Dashboard, dashboard as fetchDashboard, ledgerStatus, token } from "./api";
 import { Chat } from "./chat/Chat";
 import { Explore } from "./explore/Explore";
 import { Login } from "./shell/Login";
 import { UserMenu } from "./shell/UserMenu";
 import { VectorButton } from "./shell/VectorButton";
-import { num } from "./ui";
+import { LedgerHealthChip } from "./shell/LedgerHealth";
+import { num, useAsync } from "./ui";
 
 type View = "chat" | "explore";
 
@@ -20,7 +21,9 @@ function App() {
   const [seed, setSeed] = useState<{ text: string; nonce: number }>();
   // 账本一变，顶栏笔数、左栏账户树、预算进度都得跟着重算。
   const [revision, setRevision] = useState(0);
+  const [healthFocus, setHealthFocus] = useState(0);
   const refresh = () => setRevision((value) => value + 1);
+  const health = useAsync(() => authed ? ledgerStatus() : Promise.resolve(undefined), [authed, revision]);
 
   useEffect(() => {
     if (!authed) return;
@@ -29,7 +32,9 @@ function App() {
 
   useEffect(() => {
     if (!authed) return;
-    fetchDashboard(period).then(setData).catch(() => setData(undefined));
+    let live = true;
+    fetchDashboard(period).then((result) => live && setData(result)).catch(() => live && setData(undefined));
+    return () => { live = false; };
   }, [authed, period, revision]);
 
   if (!authed) return <Login onLogin={() => setAuthed(true)} />;
@@ -50,10 +55,10 @@ function App() {
         </div>
         <div className="hr" />
         <div className="path">{data ? `${data.period.start} → ${data.period.end}` : "读取账本…"}</div>
-        <div className="chip-warn" title="bean-check 与 git 状态需要 GET /ledger/status">
-          <i />
-          账本状态待接口
-        </div>
+        <LedgerHealthChip state={health} onOpen={() => {
+          setView("explore");
+          setHealthFocus((value) => value + 1);
+        }} />
         <div className="grow" />
         <div className="meta">
           {data ? `${num(data.recent.total)} txns · ${currency}` : "—"}
@@ -75,7 +80,7 @@ function App() {
       {view === "chat" ? (
         <Chat data={data} seed={seed} onLedgerChanged={refresh} />
       ) : (
-        <Explore data={data} period={period} onPeriod={setPeriod} onAsk={ask} onLedgerChanged={refresh} />
+        <Explore data={data} health={health} healthFocus={healthFocus} period={period} onPeriod={setPeriod} onAsk={ask} onLedgerChanged={refresh} />
       )}
     </div>
   );

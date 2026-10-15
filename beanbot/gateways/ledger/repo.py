@@ -7,6 +7,8 @@ import subprocess
 from datetime import date
 from pathlib import Path
 
+from beanbot.config import Settings
+
 ACCOUNT_FILES = {
     "assets.bean": [
         ("Assets:Cash", "现金"),
@@ -23,6 +25,11 @@ ACCOUNT_FILES = {
     "income.bean": [("Income:Salary", "工资")],
     "equity.bean": [("Equity:Opening-Balances", "期初余额")],
 }
+
+
+def ledger_root(settings: Settings, user: dict) -> Path:
+    """解析用户账本的根目录，不加载账本，也不创建文件。"""
+    return Path(user.get("ledger_path") or settings.ledger_root / str(user["id"]))
 
 
 def git(root: Path, *args: str) -> str:

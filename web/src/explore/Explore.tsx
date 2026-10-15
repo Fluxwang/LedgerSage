@@ -1,6 +1,7 @@
 import "./explore.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Dashboard } from "../api";
+import type { LedgerHealthState } from "../shell/LedgerHealth";
 import { Picker } from "../ui";
 import { BalanceSheet } from "./BalanceSheet";
 import { IncomeStatement } from "./IncomeStatement";
@@ -18,12 +19,16 @@ const PERIODS: [string, string][] = [
 
 export function Explore({
   data,
+  health,
+  healthFocus,
   period,
   onPeriod,
   onAsk,
   onLedgerChanged,
 }: {
   data?: Dashboard;
+  health: LedgerHealthState;
+  healthFocus: number;
   period: string;
   onPeriod: (period: string) => void;
   onAsk: (question: string) => void;
@@ -32,6 +37,12 @@ export function Explore({
   const [tab, setTab] = useState<Tab>("is");
   const [account, setAccount] = useState("");
   const [text, setText] = useState("");
+  useEffect(() => {
+    if (!healthFocus) return;
+    const card = document.getElementById("ledger-health");
+    card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    card?.focus({ preventScroll: true });
+  }, [healthFocus]);
 
   return (
     <div className="explore">
@@ -100,38 +111,35 @@ export function Explore({
         </div>
       </div>
 
-      {!data ? (
-        <div className="loading">读取账本…</div>
-      ) : (
-        <div className="explore-body">
-          <aside className="rail">
-            <div className="rail-group">
-              <div className="kicker">账户树</div>
+      <div className="explore-body">
+        <aside className="rail">
+          <div className="rail-group">
+            <div className="kicker">账户树</div>
+            {data && (
               <Tree
                 data={data}
-                onPick={(prefix) =>
-                  setAccount(prefix === account ? "" : prefix)
-                }
+                onPick={(prefix) => setAccount(prefix === account ? "" : prefix)}
                 picked={account}
               />
-            </div>
-            <div className="grow" />
-          </aside>
-          <main className="explore-main">
-            {tab === "is" && <IncomeStatement data={data} />}
-            {tab === "bs" && <BalanceSheet data={data} />}
-            {tab === "tx" && (
-              <Transactions
-                period={data.period}
-                filter={{ account, text }}
-                budgets={data.budgets}
-                onLedgerChanged={onLedgerChanged}
-              />
             )}
-          </main>
-          <SideRail data={data} onAsk={onAsk} />
-        </div>
-      )}
+          </div>
+          <div className="grow" />
+        </aside>
+        <main className="explore-main">
+          {!data && <div className="loading">账本暂不可用，请查看右栏健康度</div>}
+          {data && tab === "is" && <IncomeStatement data={data} />}
+          {data && tab === "bs" && <BalanceSheet data={data} />}
+          {data && tab === "tx" && (
+            <Transactions
+              period={data.period}
+              filter={{ account, text }}
+              budgets={data.budgets}
+              onLedgerChanged={onLedgerChanged}
+            />
+          )}
+        </main>
+        <SideRail data={data} health={health} onAsk={onAsk} />
+      </div>
     </div>
   );
 }
