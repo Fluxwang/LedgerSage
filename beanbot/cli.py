@@ -43,7 +43,7 @@ def main():
 
         uvicorn.run(
             "beanbot.api.app:create_app",
-            factory=True,
+            factory=True,  # True, uvicorn认为 create_app 是个工厂函数，先调用 create_app(), 再把返回值当作 app, 而不是认为 create_app 本身就是 app 对象，拿来直接用
             host=args.host,
             port=args.port,
             workers=1,
