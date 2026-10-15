@@ -54,6 +54,7 @@ def create_app(
     app.include_router(runs_router)
     app.include_router(vector_router)
 
+    # 以后不管哪里抛出 DomainError, 都由下面这个函数统一接住， 转成一个HTTP响应返回给前端
     @app.exception_handler(DomainError)
     async def domain_error(request: Request, exc: DomainError):
         return JSONResponse({"detail": str(exc)}, status_code=exc.status_code)
