@@ -1,4 +1,4 @@
-"""带版本迁移的 SQLite 存储，仅保存用户和运行轨迹。"""
+"""带版本迁移的 SQLite 存储，保存用户、运行轨迹与常用查询等非账务数据。"""
 
 import json
 import sqlite3
@@ -177,7 +177,7 @@ class Database:
         )
         return session
 
-    def create_run(self, session: dict, user_id: str, model: str, title: str) -> dict:
+    def create_run(self, session: dict, user_id: str, model: str, message: str) -> dict:
         timestamp = now()
         run = {
             "id": uuid4().hex,
@@ -190,12 +190,43 @@ class Database:
             "total_tokens": 0,
             "created_at": timestamp,
             "updated_at": timestamp,
-            "title": title,
+            "title": message[:60],
+            "message": message,
         }
         self.execute(
-            "INSERT INTO runs VALUES(?,?,?,?,?,?,?,?,?,?,?)", tuple(run.values())
+            "INSERT INTO runs(id,session_id,user_id,intent,status,model,total_ms,total_tokens,created_at,updated_at,title,message) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            tuple(run.values()),
         )
         return run
+
+    def saved_queries(self, user_id: str) -> list[dict]:
+        return self.rows(
+            "SELECT id,question,created_at FROM saved_queries WHERE user_id=? "
+            "ORDER BY created_at DESC,id DESC",
+            (user_id,),
+        )
+
+    def save_query(self, user_id: str, run: dict) -> dict:
+        with self.connect() as db:
+            # 唯一约束和同一事务让并发收藏也返回同一条记录。
+            db.execute(
+                "INSERT INTO saved_queries(id,user_id,question,run_id,created_at) "
+                "VALUES(?,?,?,?,?) ON CONFLICT(user_id,question) DO NOTHING",
+                (uuid4().hex, user_id, run["message"], run["id"], now()),
+            )
+            return dict(
+                db.execute(
+                    "SELECT id,question,created_at FROM saved_queries WHERE user_id=? AND question=?",
+                    (user_id, run["message"]),
+                ).fetchone()
+            )
+
+    def delete_saved_query(self, query_id: str, user_id: str) -> bool:
+        with self.connect() as db:
+            return db.execute(
+                "DELETE FROM saved_queries WHERE id=? AND user_id=?", (query_id, user_id)
+            ).rowcount == 1
 
     def finish_run(
         self, run_id: str, status: str, total_ms: int, intent: str | None = None

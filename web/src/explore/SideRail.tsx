@@ -1,5 +1,6 @@
 import { type Dashboard, savedQueries } from "../api";
 import { LedgerHealthCard, type LedgerHealthState } from "../shell/LedgerHealth";
+import { useState } from "react";
 import {
   Async,
   budgetState,
@@ -13,12 +14,28 @@ export function SideRail({
   data,
   health,
   onAsk,
+  onSavedAsk,
 }: {
   data?: Dashboard;
   health: LedgerHealthState;
   onAsk: (question: string) => void;
+  onSavedAsk: (question: string) => void;
 }) {
   const saved = useAsync(() => savedQueries.list(), []);
+  const [deleting, setDeleting] = useState<string>();
+  const [deleteError, setDeleteError] = useState("");
+  async function remove(id: string) {
+    setDeleting(id);
+    setDeleteError("");
+    try {
+      await savedQueries.remove(id);
+      saved.reload();
+    } catch (reason) {
+      setDeleteError((reason as Error).message);
+    } finally {
+      setDeleting(undefined);
+    }
+  }
   return (
     <aside className="panel">
       <div className="scroll">
@@ -90,17 +107,19 @@ export function SideRail({
               {(rows) => (
                 <>
                   {rows.map((row) => (
-                    <button
-                      className="btn sm"
-                      key={row.id}
-                      onClick={() => onAsk(row.title)}
-                    >
-                      {row.title}
-                    </button>
+                    <div className="saved-query" key={row.id}>
+                      <button className="btn sm saved-question" onClick={() => onSavedAsk(row.question)}>
+                        {row.question}
+                      </button>
+                      <button className="saved-delete btn sm" aria-label={`删除常用查询：${row.question}`}
+                        disabled={!!deleting} onClick={() => remove(row.id)}>×</button>
+                    </div>
                   ))}
+                  {rows.length === 0 && <div className="hollow">在对话的查询结果上点「☆ 存为常用」即可收藏。</div>}
                 </>
               )}
             </Async>
+            {deleteError && <div className="failed" role="alert">{deleteError}</div>}
           </div>
         </div>
 

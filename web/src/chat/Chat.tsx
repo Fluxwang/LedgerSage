@@ -41,10 +41,12 @@ export function Chat({
   data,
   seed,
   onLedgerChanged,
+  onSeedConsumed,
 }: {
   data?: Dashboard;
-  seed?: { text: string; nonce: number };
+  seed?: { text: string; nonce: number; autoSend?: boolean };
   onLedgerChanged: () => void;
+  onSeedConsumed: () => void;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState("");
@@ -53,12 +55,20 @@ export function Chat({
   const stream = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
 
-  // 统计页「在对话里追问」把问题塞进输入框，不直接发出去——发不发由用户决定。
+  // 常用查询直接重问，其余统计页入口仍只填入输入框。
   useEffect(() => {
-    if (!seed) return;
-    setText(seed.text);
-    box.current?.focus();
-  }, [seed?.nonce]);
+    if (!seed || running) return;
+    // 清理尚未执行的任务，避免 StrictMode 的额外挂载重复发送。
+    const timer = window.setTimeout(() => {
+      if (seed.autoSend) void send(seed.text);
+      else {
+        setText(seed.text);
+        box.current?.focus();
+      }
+      onSeedConsumed();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [seed?.nonce, running]);
 
   useEffect(() => {
     stream.current?.scrollTo({ top: stream.current.scrollHeight, behavior: "smooth" });
@@ -207,6 +217,7 @@ export function Chat({
                 {turn.receipts.map((receipt, position) => (
                   <ReceiptCard
                     receipt={receipt}
+                    canSave={!turn.running && !turn.error}
                     key={position}
                     onLanded={(landed) => land(index, position, landed)}
                     onEdited={(updated) => setTurns((items) => items.map((item, turnIndex) =>

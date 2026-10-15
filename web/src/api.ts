@@ -234,12 +234,13 @@ export const deleteTransaction = (id: string) =>
     { method: "DELETE" },
   );
 
-export type SavedQuery = { id: string; title: string; params: Record<string, unknown> };
+export type SavedQuery = { id: string; question: string; created_at: string };
 
 export const savedQueries = {
-  list: (): Promise<SavedQuery[]> => pending("GET /saved-queries", "「常用查询」需要持久化"),
-  create: (_body: Omit<SavedQuery, "id">): Promise<SavedQuery> =>
-    pending("POST /saved-queries", "对话里跑过的查询要能存为常用"),
+  list: () => api<SavedQuery[]>("/saved-queries"),
+  create: (body: { run_id: string }) =>
+    api<SavedQuery>("/saved-queries", { method: "POST", body: JSON.stringify(body) }),
+  remove: (id: string) => api<{ status: string }>(`/saved-queries/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 
 export type MonthlyReport = {

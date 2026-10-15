@@ -91,3 +91,23 @@ def test_runs_are_scoped_to_the_owner(tmp_path):
 
     assert mine["total"] == 1 and theirs["rows"] == [] and theirs["total"] == 0
     assert cross.status_code == 404
+
+
+def test_full_message_survives_summary_and_clarification(tmp_path):
+    app = create_app(settings(tmp_path), agent_model=RoutingFixtureModel())
+    with TestClient(app) as client:
+        headers = register(client)
+        question = "请按账本的实际情况仔细帮我查询，" * 8 + "这个月餐饮花了多少"
+        events = converse(client, headers, "long-query", question)
+        run_id = events[-1]["run_id"]
+        detail = client.get(f"/runs/{run_id}", headers=headers).json()
+        assert detail["message"] == question
+        assert detail["title"] == "查询账本"
+        assert client.get("/runs", headers=headers).json()["rows"][0]["message"] == question
+
+        first = converse(client, headers, "clarification", "火锅128")
+        resumed = converse(client, headers, "clarification", "微信")
+        assert resumed[-1]["run_id"] == first[-1]["run_id"]
+        detail = client.get(f"/runs/{first[-1]['run_id']}", headers=headers).json()
+        assert detail["message"] == "火锅128"
+        assert client.get("/runs", headers=headers).json()["total"] == 2
