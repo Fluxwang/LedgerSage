@@ -1,26 +1,23 @@
-import { type Dashboard, savedQueries, topPayees } from "../api";
+import { type Dashboard, savedQueries } from "../api";
+import { LedgerHealthCard, type LedgerHealthState } from "../shell/LedgerHealth";
 import {
   Async,
   budgetState,
   BUDGET_LABEL,
   Meter,
   num,
-  Stub,
   useAsync,
 } from "../ui";
 
 export function SideRail({
   data,
+  health,
   onAsk,
 }: {
-  data: Dashboard;
+  data?: Dashboard;
+  health: LedgerHealthState;
   onAsk: (question: string) => void;
 }) {
-  const payees = useAsync(
-    () =>
-      topPayees({ start: data.period.start, end: data.period.end, limit: 10 }),
-    [data.period.start],
-  );
   const saved = useAsync(() => savedQueries.list(), []);
   return (
     <aside className="panel">
@@ -30,18 +27,16 @@ export function SideRail({
             <b>前十收款方</b>
           </header>
           <div className="in">
-            <Async state={payees}>
-              {(rows) => (
-                <div className="pin">
-                  {rows.map((row) => (
-                    <div key={row.payee}>
-                      <span className="n">{row.payee}</span>
-                      <span className="v">{num(row.amount, 0)}</span>
-                    </div>
-                  ))}
+            <div className="pin">
+              {data?.top_payees.map((row) => (
+                <div key={row.payee}>
+                  <span className="n">{row.payee}</span>
+                  <span className="v">{num(row.amount, 0)}</span>
                 </div>
-              )}
-            </Async>
+              ))}
+            </div>
+            {!data && <div className="hollow">暂时无法读取排行</div>}
+            {data?.top_payees.length === 0 && <div className="hollow">当前区间没有收款方支出</div>}
           </div>
         </div>
 
@@ -50,7 +45,7 @@ export function SideRail({
             <b>预算进度 · 本月</b>
           </header>
           <div className="in">
-            {data.budgets.map((row) => {
+            {data?.budgets.map((row) => {
               const used = Number(row.used);
               const limit = Number(row.amount);
               const state = budgetState(used, limit);
@@ -78,23 +73,13 @@ export function SideRail({
                 </div>
               );
             })}
-            {data.budgets.length === 0 && (
+            {data?.budgets.length === 0 && (
               <div className="hollow">还没有设置预算</div>
             )}
           </div>
         </div>
 
-        <div className="pcard">
-          <header>
-            <b>账本健康度</b>
-          </header>
-          <div className="in">
-            <Stub
-              endpoint="GET /ledger/status"
-              why="bean-check、缺收款方笔数、超期未对账账户、git 同步时间。"
-            />
-          </div>
-        </div>
+        <LedgerHealthCard state={health} />
 
         <div className="pcard">
           <header>

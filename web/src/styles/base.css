@@ -255,6 +255,20 @@ pre {
   border-radius: 99px;
   background: currentColor;
 }
+.topbar button.chip-ok,
+.topbar button.chip-warn {
+  max-width: 360px;
+}
+.topbar .chip-ok span,
+.topbar .chip-warn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar .chip-ok i,
+.topbar .chip-warn i {
+  flex: none;
+}
 
 .usermenu {
   position: relative;

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { MissingEndpoint } from "../api";
 
-type AsyncState<T> = { data?: T; error?: unknown; loading: boolean };
+export type AsyncState<T> = { data?: T; error?: unknown; loading: boolean };
 
 /** 把「接口还没有」和「接口报错」分开：前者渲染占位卡，后者渲染错误条。 */
 export function useAsync<T>(load: () => Promise<T>, deps: unknown[]): AsyncState<T> & { reload: () => void } {
