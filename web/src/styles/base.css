@@ -1,3 +1,14 @@
+.saved-query { display: flex; align-items: center; gap: 4px; }
+.saved-question { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.saved-delete { opacity: 0; }
+.saved-query:hover .saved-delete, .saved-query:focus-within .saved-delete { opacity: 1; }
+@media (hover: none) { .saved-delete { opacity: 1; } }
+.run-history { display: flex; flex: 1; min-height: 0; overflow: auto; }
+.run-history > aside { width: 260px; flex-shrink: 0; padding: 20px; border-right: 1px solid var(--line); overflow: auto; }
+.run-history > section { flex: 1; min-width: 0; padding: 24px; overflow: auto; }
+.run-detail { max-width: 900px; margin: auto; }
+.run-detail blockquote { margin: 12px 0 24px; padding: 16px; border-left: 3px solid var(--green); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere; }
+.history-pages { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 20px; }
 /* LedgerSage 设计令牌：暖纸底 + 墨色文字 + 账本绿，单一浅色主题（设计稿未定义深色）。*/
 :root {
   color-scheme: light;

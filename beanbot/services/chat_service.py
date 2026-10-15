@@ -59,7 +59,7 @@ class ChatService:
                 }
         if not resumed:
             run = self.database.create_run(
-                session, user["id"], self.model_name, message[:60]
+                session, user["id"], self.model_name, message
             )
             graph_input = {
                 "message": message,

@@ -9,8 +9,9 @@ import { UserMenu } from "./shell/UserMenu";
 import { VectorButton } from "./shell/VectorButton";
 import { LedgerHealthChip } from "./shell/LedgerHealth";
 import { num, useAsync } from "./ui";
+import { RunHistory } from "./history/RunHistory";
 
-type View = "chat" | "explore";
+type View = "chat" | "explore" | "history";
 
 function App() {
   const [authed, setAuthed] = useState(Boolean(token()));
@@ -18,7 +19,7 @@ function App() {
   const [me, setMe] = useState("");
   const [period, setPeriod] = useState("this_month");
   const [data, setData] = useState<Dashboard>();
-  const [seed, setSeed] = useState<{ text: string; nonce: number }>();
+  const [seed, setSeed] = useState<{ text: string; nonce: number; autoSend?: boolean }>();
   // 账本一变，顶栏笔数、左栏账户树、预算进度都得跟着重算。
   const [revision, setRevision] = useState(0);
   const [healthFocus, setHealthFocus] = useState(0);
@@ -41,8 +42,8 @@ function App() {
 
   const currency = data?.accounts[0]?.currency ?? "CNY";
 
-  function ask(question: string) {
-    setSeed({ text: question, nonce: Date.now() });
+  function ask(question: string, autoSend = false) {
+    setSeed({ text: question, nonce: Date.now(), autoSend });
     setView("chat");
   }
 
@@ -64,6 +65,9 @@ function App() {
           {data ? `${num(data.recent.total)} txns · ${currency}` : "—"}
         </div>
         <VectorButton />
+        <button className="btn sm" onClick={() => setView(view === "history" ? "chat" : "history")}>
+          {view === "history" ? "← 返回对话" : "决策历史"}
+        </button>
         <button className="btn sm" onClick={() => setView(view === "chat" ? "explore" : "chat")}>
           {view === "chat" ? "📊 打开统计页面" : "← 返回对话"}
         </button>
@@ -78,9 +82,11 @@ function App() {
       </header>
 
       {view === "chat" ? (
-        <Chat data={data} seed={seed} onLedgerChanged={refresh} />
+        <Chat data={data} seed={seed} onSeedConsumed={() => setSeed(undefined)} onLedgerChanged={refresh} />
+      ) : view === "history" ? (
+        <RunHistory />
       ) : (
-        <Explore data={data} health={health} healthFocus={healthFocus} period={period} onPeriod={setPeriod} onAsk={ask} onLedgerChanged={refresh} />
+        <Explore data={data} health={health} healthFocus={healthFocus} period={period} onPeriod={setPeriod} onAsk={ask} onSavedAsk={(question) => ask(question, true)} onLedgerChanged={refresh} />
       )}
     </div>
   );

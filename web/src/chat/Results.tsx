@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { confirmWrite, editWrite, rejectWrite, undoCommit, type Validation } from "../api";
+import { confirmWrite, editWrite, rejectWrite, savedQueries, undoCommit, type Validation } from "../api";
 import { abs, Bar, budgetState, BUDGET_LABEL, Disclose, Meter, num, Picker } from "../ui";
 
 /* tools 节点的回执。带 pending_id 的是预览，带 commit 的是已落盘（ADR 0012）。 */
@@ -26,7 +26,7 @@ export type WriteReceipt = {
 /* budget 节点的回执，同样先预览后确认 */
 export type BudgetReceipt = Omit<WriteReceipt, "kind"> & { kind: "budget"; account: string };
 /* query 节点的回执 */
-export type QueryReceipt = { kind: "query"; tool: string; arguments: any; result: any };
+export type QueryReceipt = { kind: "query"; run_id?: string; tool: string; arguments: any; result: any };
 export type Receipt = WriteReceipt | BudgetReceipt | QueryReceipt;
 
 export function classify(event: any): Receipt {
@@ -355,7 +355,23 @@ function Balances({ balances }: { balances: Record<string, Record<string, string
   );
 }
 
-export function QueryCard({ receipt }: { receipt: QueryReceipt }) {
+export function QueryCard({ receipt, canSave = true }: { receipt: QueryReceipt; canSave?: boolean }) {
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  async function save() {
+    if (!receipt.run_id || saving || saved) return;
+    setSaving(true);
+    setError("");
+    try {
+      await savedQueries.create({ run_id: receipt.run_id });
+      setSaved(true);
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
   const result = receipt.result;
   const isBudget = Array.isArray(result) && result.length > 0 && "used" in result[0] && "amount" in result[0];
   const isGroup = Array.isArray(result) && result.length > 0 && "group" in result[0];
@@ -363,6 +379,14 @@ export function QueryCard({ receipt }: { receipt: QueryReceipt }) {
   const isAccounts = Array.isArray(result) && result.length > 0 && "display_name" in result[0] && !("used" in result[0]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+      {receipt.run_id && (
+        <div>
+          <button className="btn sm" disabled={!canSave || saving || saved} onClick={save}>
+            {saved ? "已收藏" : saving ? "收藏中…" : "☆ 存为常用"}
+          </button>
+          {error && <div className="failed" role="alert">{error}</div>}
+        </div>
+      )}
       <div className="card">
         <Disclose label={`${receipt.tool} 的参数`} defaultOpen>
           <div className="io" style={{ gridTemplateColumns: "1fr", borderTop: 0 }}>
@@ -397,8 +421,8 @@ export function QueryCard({ receipt }: { receipt: QueryReceipt }) {
   );
 }
 
-export function ReceiptCard({ receipt, onLanded, onEdited }: { receipt: Receipt; onLanded?: (landed: Landed) => void; onEdited?: (receipt: WriteReceipt) => void }) {
+export function ReceiptCard({ receipt, onLanded, onEdited, canSave }: { receipt: Receipt; onLanded?: (landed: Landed) => void; onEdited?: (receipt: WriteReceipt) => void; canSave?: boolean }) {
   if (receipt.kind === "write") return <WriteCard receipt={receipt} onLanded={onLanded} onEdited={onEdited} />;
   if (receipt.kind === "budget") return <BudgetCard receipt={receipt} />;
-  return <QueryCard receipt={receipt} />;
+  return <QueryCard receipt={receipt} canSave={canSave} />;
 }

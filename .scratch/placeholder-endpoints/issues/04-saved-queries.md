@@ -4,15 +4,22 @@
 
 **Blocked by:** 03 — 运行保存用户原话
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 新增一个版本迁移，建 `saved_queries` 表：`id, user_id, question, run_id, created_at`，并对 `(user_id, question)` 加唯一约束
-- [ ] `GET /saved-queries` 返回当前用户的 `[{ id, question, created_at }]`，按 `created_at` 倒序
-- [ ] `POST /saved-queries` 的请求体是 `{ run_id }`，`question` 取自这次运行的 `message`
-- [ ] 对记账运行、预算运行、别人的运行、`message` 为空的旧运行调用 `POST`，都被拒绝，返回 4xx
-- [ ] 对同一句话收藏两次，返回同一条记录，列表里只有一条
-- [ ] `DELETE /saved-queries/{id}` 只能删除自己的记录；删除别人的或者不存在的记录，都返回 404
-- [ ] 查询类回答的结果卡上有「☆ 存为常用」，记账类回答上没有；点过之后显示「已收藏」
-- [ ] 右栏列表显示真实数据；点击一条就发起提问；悬停出现 ×，点击后删除并刷新列表
-- [ ] 前端的 `SavedQuery` 类型去掉 `params`，`title` 改名为 `question`
-- [ ] 测试用按关键词路由意图的 `FixtureModel` 产生查询运行和记账运行，从 HTTP 层断言上面这些行为；`npm run build` 通过
+- [x] 新增一个版本迁移，建 `saved_queries` 表：`id, user_id, question, run_id, created_at`，并对 `(user_id, question)` 加唯一约束
+- [x] `GET /saved-queries` 返回当前用户的 `[{ id, question, created_at }]`，按 `created_at` 倒序
+- [x] `POST /saved-queries` 的请求体是 `{ run_id }`，`question` 取自这次运行的 `message`
+- [x] 对记账运行、预算运行、别人的运行、`message` 为空的旧运行调用 `POST`，都被拒绝，返回 4xx
+- [x] 对同一句话收藏两次，返回同一条记录，列表里只有一条
+- [x] `DELETE /saved-queries/{id}` 只能删除自己的记录；删除别人的或者不存在的记录，都返回 404
+- [x] 查询类回答的结果卡上有「☆ 存为常用」，记账类回答上没有；点过之后显示「已收藏」
+- [x] 右栏列表显示真实数据；点击一条就发起提问；悬停出现 ×，点击后删除并刷新列表
+- [x] 前端的 `SavedQuery` 类型去掉 `params`，`title` 改名为 `question`
+- [x] 测试用按关键词路由意图的 `FixtureModel` 产生查询运行和记账运行，从 HTTP 层断言上面这些行为；`npm run build` 通过
+
+## Comments
+
+- 已实现并完成代码审查。03 新增决策历史入口，详情顶部显示完整原话，旧运行回退到标题。04 完成查询收藏、去重、按用户隔离、删除和重新提问。
+- 验证：`python -X utf8 -m pytest -q` 整合远端 ticket 01–02 后全量 115 项通过；`python -m mypy beanbot`、`npm run build` 通过。
+- 使用现有 Playwright/Chromium 做前端冒烟（接口响应模拟）：收藏后显示已收藏，右栏重新提问只发送一次，删除后刷新，记账结果无收藏按钮，历史原话与旧运行回退均通过，无页面异常。
+- Windows 本地测试环境补装 tzdata，并开启 Python UTF-8 模式；未改动项目依赖或引入前端测试框架。

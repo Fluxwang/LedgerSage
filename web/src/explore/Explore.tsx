@@ -24,6 +24,7 @@ export function Explore({
   period,
   onPeriod,
   onAsk,
+  onSavedAsk,
   onLedgerChanged,
 }: {
   data?: Dashboard;
@@ -32,6 +33,7 @@ export function Explore({
   period: string;
   onPeriod: (period: string) => void;
   onAsk: (question: string) => void;
+  onSavedAsk: (question: string) => void;
   onLedgerChanged: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("is");
@@ -138,7 +140,7 @@ export function Explore({
             />
           )}
         </main>
-        <SideRail data={data} health={health} onAsk={onAsk} />
+        <SideRail data={data} health={health} onAsk={onAsk} onSavedAsk={onSavedAsk} />
       </div>
     </div>
   );
