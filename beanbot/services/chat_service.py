@@ -24,7 +24,7 @@ class ChatService:
         self, user: dict, thread_id: str, message: str
     ) -> AsyncIterator[dict]:
         graph_input: Any
-        session = self.database.session(user["id"], thread_id)
+        session = self.database.session(user["id"], thread_id, message)
         active_run_id = session.get("active_run_id")
         pending_at = session.get("pending_at")
         resumed = False

@@ -11,6 +11,7 @@ from beanbot.api.auth import router as auth_router
 from beanbot.api.chat import router as chat_router
 from beanbot.api.ledger import router as ledger_router
 from beanbot.api.runs import router as runs_router
+from beanbot.api.sessions import router as sessions_router
 from beanbot.api.saved_queries import router as saved_queries_router
 from beanbot.api.vector import router as vector_router
 from beanbot.config import Settings
@@ -53,6 +54,7 @@ def create_app(
     app.include_router(chat_router)
     app.include_router(ledger_router)
     app.include_router(runs_router)
+    app.include_router(sessions_router)
     app.include_router(saved_queries_router)
     app.include_router(vector_router)
 
