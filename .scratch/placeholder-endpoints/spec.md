@@ -164,5 +164,7 @@ Branch: feat/placeholder-endpoints
 ## Further Notes
 
 - 实现拆成 6 张票（见 `issues/`）：01 前十收款方、02 账本健康度、03 运行保存用户原话，这三张可以直接开始；04 常用查询和 05 历史对话回放都依赖 03；06 继续没完成的事依赖 05。
+- 01–06 完成后的检查中又补了两张票：07 对话页 diff 卡接上 bean-check 结果（这一处 `<Stub>` 在最初统计时被漏掉了），08 回放遇到账本问题时降级显示。两张都可以直接开始。
+- 对话页右栏还有一处「写入历史」占位（`GET /ledger/history`），`api.ts` 里也没有对应的函数，所以不在最初的统计里。它不在本期范围，以后单独 grill。
 - 前端 API 模块文件头注释里的缺失接口清单路径已经过时，现在在 `docs/archive/ledgersage-frontend/` 下，顺手改掉。
 - 全部完成后，把本目录 `git mv` 到 `docs/archive/placeholder-endpoints/`。
