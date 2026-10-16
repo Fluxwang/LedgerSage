@@ -13,6 +13,7 @@ export type WriteReceipt = {
   balanced: boolean;
   validations: Validation[];
   pending_id?: string;
+  replay_status?: "pending" | "confirmed" | "rejected" | "expired";
   commit?: string;
   transactions?: {
     payee: string;
@@ -61,11 +62,11 @@ function parseEntry(text: string) {
 type Landed = { commit: string; file: string; line: number };
 
 /** 预览态给「确认写入 / 丢弃」，已落盘态给「撤销」。 */
-function useWriteActions(pendingId?: string, onLanded?: (landed: Landed) => void) {
+function useWriteActions(pendingId?: string, onLanded?: (landed: Landed) => void, replayStatus?: WriteReceipt["replay_status"]) {
   const [busy, setBusy] = useState(false);
   const [landed, setLanded] = useState<Landed | null>(null);
-  const [state, setState] = useState<"preview" | "confirmed" | "rejected" | "undone">(
-    pendingId ? "preview" : "confirmed",
+  const [state, setState] = useState<"preview" | "confirmed" | "rejected" | "undone" | "expired">(
+    replayStatus ? (replayStatus === "pending" ? "preview" : replayStatus) : pendingId ? "preview" : "confirmed",
   );
   const [error, setError] = useState("");
 
@@ -102,10 +103,12 @@ function Actions({
   receipt,
   actions,
 }: {
-  receipt: { pending_id?: string; commit?: string };
+  receipt: { pending_id?: string; commit?: string; replay_status?: WriteReceipt["replay_status"] };
   actions: ReturnType<typeof useWriteActions>;
 }) {
   const commit = actions.landed?.commit ?? receipt.commit;
+  if (actions.state === "expired") return <div className="linkish">已过期，请重新记一次</div>;
+  if (receipt.replay_status && actions.state === "confirmed") return <div className="linkish">已确认写入账本</div>;
   if (actions.state === "preview")
     return (
       <>
@@ -127,7 +130,7 @@ function Actions({
 }
 
 export function WriteCard({ receipt, onLanded, onEdited }: { receipt: WriteReceipt; onLanded?: (landed: Landed) => void; onEdited?: (receipt: WriteReceipt) => void }) {
-  const actions = useWriteActions(receipt.pending_id, onLanded);
+  const actions = useWriteActions(receipt.pending_id, onLanded, receipt.replay_status);
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState("");
   async function change(index: number, field: "from_account" | "to_account", account: string) {
@@ -150,7 +153,7 @@ export function WriteCard({ receipt, onLanded, onEdited }: { receipt: WriteRecei
       <div className="body">
         <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>
-            {actions.state === "preview" ? "待确认交易" : actions.state === "confirmed" ? "已写入账本" : "已丢弃"}
+            {actions.state === "preview" ? "待确认交易" : actions.state === "confirmed" ? "已写入账本" : actions.state === "expired" ? "已过期" : "已丢弃"}
           </div>
           {receipt.balanced && (
             <div className="mono" style={{ fontSize: 10.5, color: "var(--green)" }}>借贷平衡 ✓</div>
@@ -213,15 +216,15 @@ export function WriteCard({ receipt, onLanded, onEdited }: { receipt: WriteRecei
   );
 }
 
-export function BudgetCard({ receipt }: { receipt: BudgetReceipt }) {
-  const actions = useWriteActions(receipt.pending_id);
+export function BudgetCard({ receipt, onLanded }: { receipt: BudgetReceipt; onLanded?: (landed: Landed) => void }) {
+  const actions = useWriteActions(receipt.pending_id, onLanded, receipt.replay_status);
   const warnings = receipt.validations?.filter((check) => check.level === "warn") ?? [];
   return (
     <div className="card accent">
       <div className="body">
         <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>
-            {actions.state === "preview" ? "待确认的预算" : actions.state === "confirmed" ? "预算已写入账本" : "已丢弃"}
+            {actions.state === "preview" ? "待确认的预算" : actions.state === "confirmed" ? "预算已写入账本" : actions.state === "expired" ? "已过期" : "已丢弃"}
           </div>
           <div className="grow" />
           <div className="linkish">{receipt.file}</div>
@@ -423,6 +426,6 @@ export function QueryCard({ receipt, canSave = true }: { receipt: QueryReceipt; 
 
 export function ReceiptCard({ receipt, onLanded, onEdited, canSave }: { receipt: Receipt; onLanded?: (landed: Landed) => void; onEdited?: (receipt: WriteReceipt) => void; canSave?: boolean }) {
   if (receipt.kind === "write") return <WriteCard receipt={receipt} onLanded={onLanded} onEdited={onEdited} />;
-  if (receipt.kind === "budget") return <BudgetCard receipt={receipt} />;
+  if (receipt.kind === "budget") return <BudgetCard receipt={receipt} onLanded={onLanded} />;
   return <QueryCard receipt={receipt} canSave={canSave} />;
 }

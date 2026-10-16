@@ -6,14 +6,22 @@
 
 **Blocked by:** 03 — 运行保存用户原话
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 会话第一次创建运行时，把会话 `title` 写成用户消息的前 20 个字；已有的「新对话」不回填
-- [ ] `GET /sessions` 返回 `[{ thread_id, title, last_active_at, has_pending_ask }]`，按 `last_active_at` 倒序，最多 30 条，只包含当前用户的会话
-- [ ] `GET /sessions/{thread_id}/runs` 返回按时间升序的运行；每次运行带上 `message`、完整的步骤、关联的待确认写入（带当前 `status`），以及会话级的 `active_run_id` / `pending_at`；这个端点取代前端预设的 `/sessions/{thread_id}/messages`
-- [ ] 别人的 `thread_id` 或者不存在的 `thread_id` 返回 404
-- [ ] 左栏是真实列表，当前会话高亮；点「＋ 新对话」后，在发出第一条消息之前，列表里不会多出空会话
-- [ ] 点开会话后，用回放数据重建对话轮次，复用现有的结果卡、确认卡和工具轨迹组件；`message` 为空的旧运行，用户气泡退回显示 `title`
-- [ ] 在回放出来的会话里继续发消息，新运行出现在同一个会话下面
-- [ ] 测试：用 `converse()` 在同一个 `thread_id` 下发两句话，`/sessions` 的标题是第一句的开头，`/sessions/{id}/runs` 有两次运行且步骤完整；跨用户隔离；`npm run build` 通过
-- [ ] 手工验证：发两条消息、刷新页面，从左栏点回这个会话，能看到两轮完整的对话
+- [x] 会话第一次创建运行时，把会话 `title` 写成用户消息的前 20 个字；已有的「新对话」不回填
+- [x] `GET /sessions` 返回 `[{ thread_id, title, last_active_at, has_pending_ask }]`，按 `last_active_at` 倒序，最多 30 条，只包含当前用户的会话
+- [x] `GET /sessions/{thread_id}/runs` 返回按时间升序的运行；每次运行带上 `message`、完整的步骤、关联的待确认写入（带当前 `status`），以及会话级的 `active_run_id` / `pending_at`；这个端点取代前端预设的 `/sessions/{thread_id}/messages`
+- [x] 别人的 `thread_id` 或者不存在的 `thread_id` 返回 404
+- [x] 左栏是真实列表，当前会话高亮；点「＋ 新对话」后，在发出第一条消息之前，列表里不会多出空会话
+- [x] 点开会话后，用回放数据重建对话轮次，复用现有的结果卡、确认卡和工具轨迹组件；`message` 为空的旧运行，用户气泡退回显示 `title`
+- [x] 在回放出来的会话里继续发消息，新运行出现在同一个会话下面
+- [x] 测试：用 `converse()` 在同一个 `thread_id` 下发两句话，`/sessions` 的标题是第一句的开头，`/sessions/{id}/runs` 有两次运行且步骤完整；跨用户隔离；`npm run build` 通过
+- [x] 手工验证：发两条消息、刷新页面，从左栏点回这个会话，能看到两轮完整的对话
+
+
+## 验证记录
+
+- HTTP API 测试覆盖列表排序与 30 条限制、标题、完整步骤、用户隔离、旧运行原话回退、待确认写入编辑后回放与确认/丢弃/过期，以及有效和过期追问的续跑。
+- 全量 pytest：119 passed；mypy：34 个源文件通过；npm run build：通过。
+- 使用临时数据库、FixtureModel 和本机 Edge 完成浏览器验收：两轮对话刷新回放、新对话不新增空会话、追问恢复、刷新后确认及已确认只读展示；无页面运行异常。
+- 回放按运行聚合，遵循现有 runs.message/run_steps 数据结构；不读取 checkpoint，不新增消息存储设计。

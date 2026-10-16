@@ -143,14 +143,15 @@ export const editWrite = (id: string, transactionIndex: number, field: "from_acc
     method: "PATCH", body: JSON.stringify({ transaction_index: transactionIndex, [field]: account }),
   });
 
-export type Session = { thread_id: string; title: string; updated_at: string };
+export type Session = { thread_id: string; title: string; last_active_at: string; has_pending_ask: boolean };
 
-/** 左侧「对话」列表。目前 thread_id 每次刷新都是新的随机 UUID。 */
+/** 最近 30 个对话，选择后沿用原来的 thread_id。 */
 export const sessions = (): Promise<Session[]> =>
-  pending("GET /sessions", "左栏对话列表需要可枚举、可恢复的会话");
+  api("/sessions");
 
-export const sessionMessages = (_threadId: string): Promise<any[]> =>
-  pending("GET /sessions/{thread_id}/messages", "切换会话要能回放历史消息与工具轨迹");
+export type SessionReplay = { active_run_id: string | null; pending_at: string | null; has_pending_ask: boolean; ask_expired: boolean; runs: any[] };
+export const sessionRuns = (threadId: string): Promise<SessionReplay> =>
+  api(`/sessions/${encodeURIComponent(threadId)}/runs`);
 
 export type AccountNode = {
   account: string;

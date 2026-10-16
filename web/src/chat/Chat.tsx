@@ -1,6 +1,6 @@
 import "./chat.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { clearToken, type Dashboard, token } from "../api";
+import { clearToken, type Dashboard, token, sessions, sessionRuns, type Session, type SessionReplay } from "../api";
 import { abs, num } from "../ui";
 import { LedgerPanel } from "./LedgerPanel";
 import { classify, ReceiptCard, type Receipt, type WriteReceipt } from "./Results";
@@ -15,7 +15,33 @@ type Turn = {
   note?: string;
   error?: string;
   running: boolean;
+  replay?: boolean;
+  askActive?: boolean;
 };
+
+/** 运行是回放单位；只从公开的步骤和当前待确认写入重建，不读 checkpoint。 */
+function replayTurns(data: SessionReplay): Turn[] {
+  return data.runs.map((run) => {
+    const steps: Step[] = run.steps.map((step: any) => ({ ...step, node:
+      step.kicker === "CLASSIFY" ? "classify" : step.kicker === "PARSE" ? "extract" :
+      step.kicker === "REPLY" ? "reply" : step.kicker === "ASK" ? "prepare_ask" :
+      step.payload.receipt?.tool ? "query" : step.payload.receipt?.kind === "budget" ? "budget" : "tools" }));
+    const receipts = steps.filter((step) => step.payload?.receipt).map((step) => {
+      const receipt = { ...step.payload.receipt, run_id: run.id };
+      const pending = run.pending_writes.find((item: any) => item.id === receipt.pending_id);
+      return classify(pending ? { ...receipt, ...(pending.receipt ?? {}), replay_status: pending.status, commit: pending.commit_sha ?? undefined } : receipt);
+    });
+    const asks = steps.filter((step) => step.payload?.ask);
+    const ask = asks.at(-1)?.payload.ask;
+    const active = data.active_run_id === run.id && data.has_pending_ask;
+    return { said: run.message || run.title, steps, receipts,
+      reply: steps.filter((step) => step.kicker === "REPLY").at(-1)?.payload.message,
+      ask, askActive: active, replay: true,
+      note: ask ? active ? "追问中" : (data.active_run_id === run.id && data.ask_expired) || run.status === "clarification" || run.status === "failed" ? "追问已作废" : "追问已答复" : undefined,
+      error: run.status === "failed" && !ask ? "这次运行失败" : run.status === "interrupted" ? "这次运行已中断" : undefined,
+      running: false };
+  });
+}
 
 const SUGGESTIONS = ["昨天的地铁 6 块", "这个月餐饮花了多少", "把餐饮预算设成 1500"];
 
@@ -51,13 +77,38 @@ export function Chat({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState("");
   const [running, setRunning] = useState(false);
-  const [thread, setThread] = useState(() => crypto.randomUUID());
+  const [thread, setThread] = useState<string>(() => crypto.randomUUID());
+  const [history, setHistory] = useState<Session[]>([]);
+  const [historyError, setHistoryError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [pendingAsk, setPendingAsk] = useState(false);
+  const generation = useRef(0);
+  const renderedGeneration = generation.current;
   const stream = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
 
+  async function refreshHistory() {
+    try { setHistory(await sessions()); setHistoryError(""); }
+    catch (error) { setHistoryError((error as Error).message); }
+  }
+  useEffect(() => { void refreshHistory(); }, []);
+
+  async function openSession(id: string) {
+    if (running) return;
+    const current = ++generation.current;
+    setLoading(true);
+    setHistoryError("");
+    try {
+      const replay = await sessionRuns(id);
+      if (current !== generation.current) return;
+      setThread(id); setTurns(replayTurns(replay)); setPendingAsk(replay.has_pending_ask); setText("");
+    } catch (error) { if (current === generation.current) setHistoryError((error as Error).message); }
+    finally { if (current === generation.current) setLoading(false); }
+  }
+
   // 常用查询直接重问，其余统计页入口仍只填入输入框。
   useEffect(() => {
-    if (!seed || running) return;
+    if (!seed || running || loading) return;
     // 清理尚未执行的任务，避免 StrictMode 的额外挂载重复发送。
     const timer = window.setTimeout(() => {
       if (seed.autoSend) void send(seed.text);
@@ -68,7 +119,7 @@ export function Chat({
       onSeedConsumed();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [seed?.nonce, running]);
+  }, [seed?.nonce, running, loading]);
 
   useEffect(() => {
     stream.current?.scrollTo({ top: stream.current.scrollHeight, behavior: "smooth" });
@@ -85,6 +136,7 @@ export function Chat({
   /** 确认写入之后把回执换成落盘后的那份，右栏跟着从「即将写入」变成「已写入」。 */
   const land = (turnIndex: number, position: number, landed: { commit: string; file: string; line: number }) => {
     onLedgerChanged();
+    if (generation.current !== renderedGeneration) return;
     setTurns((items) =>
       items.map((turn, index) =>
         index !== turnIndex
@@ -107,7 +159,8 @@ export function Chat({
 
   async function send(value = text) {
     const message = value.trim();
-    if (!message || running) return;
+    if (!message || running || loading) return;
+    setPendingAsk(false);
     setText("");
     setRunning(true);
     setTurns((items) => [...items, { said: message, steps: [], receipts: [], running: true }]);
@@ -135,8 +188,10 @@ export function Chat({
         else if (event.type === "message") patch((turn) => ({ ...turn, reply: event.content }));
         else if (event.type === "receipt")
           patch((turn) => ({ ...turn, receipts: [...turn.receipts, classify(event)] }));
-        else if (event.type === "ask")
+        else if (event.type === "ask") {
+          setPendingAsk(true);
           patch((turn) => ({ ...turn, ask: { question: event.question, candidates: event.candidates ?? [] } }));
+        }
         else if (event.type === "error") patch((turn) => ({ ...turn, error: event.detail }));
       }
     } catch (reason) {
@@ -144,6 +199,7 @@ export function Chat({
     } finally {
       patch((turn) => ({ ...turn, running: false }));
       setRunning(false);
+      void refreshHistory();
     }
   }
 
@@ -164,19 +220,24 @@ export function Chat({
       <aside className="rail">
         <div className="rail-group">
           <div className="kicker">对话</div>
-          <button className="rail-item on">本次对话</button>
+          {!history.some((item) => item.thread_id === thread) && <button className="rail-item on">本次对话</button>}
           <button
             className="rail-item"
+            disabled={running}
             onClick={() => {
+              generation.current++;
+              setLoading(false); setPendingAsk(false); setText("");
               setTurns([]);
               setThread(crypto.randomUUID());
             }}
           >
             ＋ 新对话
           </button>
-          <div className="linkish" style={{ padding: "4px 8px" }} title="历史对话列表需要 GET /sessions">
-            历史对话待接口
-          </div>
+          {history.map((item) => <button key={item.thread_id} className={`rail-item${item.thread_id === thread ? " on" : ""}`}
+            disabled={running} onClick={() => void openSession(item.thread_id)}>
+            {item.title}{item.has_pending_ask ? " · 待答复" : ""}
+          </button>)}
+          {historyError && <div className="failed" role="alert">{historyError}</div>}
         </div>
         <div className="rail-group">
           <div className="kicker">账本</div>
@@ -193,6 +254,7 @@ export function Chat({
 
       <section className="convo">
         <div className="stream" ref={stream}>
+          {loading && <div className="sysnote">读取历史对话…</div>}
           {turns.length === 0 && (
             <div className="welcome">
               <h2>今天想记点什么？</h2>
@@ -200,7 +262,7 @@ export function Chat({
             </div>
           )}
           {turns.map((turn, index) => (
-            <article className="turn" key={index}>
+            <article className="turn" key={`${thread}-${generation.current}-${index}-${turn.replay ? "replay" : "live"}`}>
               {turn.said && (
                 <div className="said">
                   <div>{turn.said}</div>
@@ -220,9 +282,9 @@ export function Chat({
                     canSave={!turn.running && !turn.error}
                     key={position}
                     onLanded={(landed) => land(index, position, landed)}
-                    onEdited={(updated) => setTurns((items) => items.map((item, turnIndex) =>
+                    onEdited={(updated) => { if (generation.current !== renderedGeneration) return; setTurns((items) => items.map((item, turnIndex) =>
                       turnIndex === index ? { ...item, receipts: item.receipts.map((old, slot) => slot === position ? updated : old) } : item
-                    ))}
+                    )); }}
                   />
                 ))}
                 {turn.ask && (
@@ -231,7 +293,7 @@ export function Chat({
                       <div className="prose">{turn.ask.question}</div>
                       <div className="suggest">
                         {turn.ask.candidates.map((candidate) => (
-                          <button key={candidate} onClick={() => send(candidate)}>
+                          <button key={candidate} disabled={running || loading || (turn.replay && !turn.askActive)} onClick={() => send(candidate)}>
                             {candidate}
                           </button>
                         ))}
@@ -247,9 +309,10 @@ export function Chat({
         </div>
 
         <div className="composer">
+          {pendingAsk && <div className="sysnote">上次的追问还在等你回答</div>}
           <div className="suggest">
             {SUGGESTIONS.map((item) => (
-              <button key={item} onClick={() => send(item)} disabled={running}>
+              <button key={item} onClick={() => send(item)} disabled={running || loading}>
                 {item}
               </button>
             ))}
@@ -257,6 +320,7 @@ export function Chat({
           <div className="inputbox">
             <textarea
               ref={box}
+              disabled={loading}
               value={text}
               rows={1}
               onChange={(event) => setText(event.target.value)}
@@ -268,7 +332,7 @@ export function Chat({
               }}
               placeholder="用一句话记账，或问账本任何问题…"
             />
-            <button className="btn primary" onClick={() => send()} disabled={running || !text.trim()}>
+            <button className="btn primary" onClick={() => send()} disabled={running || loading || !text.trim()}>
               {running ? "运行中…" : "发送"}
             </button>
             <kbd>⌘↵</kbd>

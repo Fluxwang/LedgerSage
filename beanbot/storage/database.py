@@ -154,7 +154,7 @@ class Database:
             (status, commit, now(), pending_id, "pending"),
         )
 
-    def session(self, user_id: str, thread_id: str) -> dict:
+    def session(self, user_id: str, thread_id: str, message: str = '') -> dict:
         rows = self.rows(
             "SELECT * FROM sessions WHERE user_id=? AND thread_id=?",
             (user_id, thread_id),
@@ -165,7 +165,7 @@ class Database:
             "id": uuid4().hex,
             "user_id": user_id,
             "thread_id": thread_id,
-            "title": "新对话",
+            "title": message[:20] if message else "新对话",
             "created_at": now(),
             "last_active_at": now(),
             "active_run_id": None,
