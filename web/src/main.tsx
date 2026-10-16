@@ -82,7 +82,7 @@ function App() {
       </header>
 
       {view === "chat" ? (
-        <Chat data={data} seed={seed} onSeedConsumed={() => setSeed(undefined)} onLedgerChanged={refresh} />
+        <Chat data={data} health={health} seed={seed} onSeedConsumed={() => setSeed(undefined)} onLedgerChanged={refresh} />
       ) : view === "history" ? (
         <RunHistory />
       ) : (

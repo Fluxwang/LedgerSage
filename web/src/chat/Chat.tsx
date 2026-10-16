@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { clearToken, type Dashboard, token, sessions, sessionRuns, type Session, type SessionReplay } from "../api";
 import { abs, num } from "../ui";
 import { LedgerPanel } from "./LedgerPanel";
+import type { LedgerHealthState } from "../shell/LedgerHealth";
 import { classify, ReceiptCard, type Receipt, type WriteReceipt } from "./Results";
 import { type Step, ToolTrace, traceSummary } from "./ToolTrace";
 
@@ -29,7 +30,7 @@ function replayTurns(data: SessionReplay): Turn[] {
     const receipts = steps.filter((step) => step.payload?.receipt).map((step) => {
       const receipt = { ...step.payload.receipt, run_id: run.id };
       const pending = run.pending_writes.find((item: any) => item.id === receipt.pending_id);
-      return classify(pending ? { ...receipt, ...(pending.receipt ?? {}), replay_status: pending.status, commit: pending.commit_sha ?? undefined } : receipt);
+      return classify(pending ? { ...receipt, ...(pending.receipt ?? {}), replay_status: pending.status, preview_error: pending.preview_error, commit: pending.commit_sha ?? undefined } : receipt);
     });
     const asks = steps.filter((step) => step.payload?.ask);
     const ask = asks.at(-1)?.payload.ask;
@@ -65,11 +66,13 @@ async function* frames(body: ReadableStream<Uint8Array>) {
 
 export function Chat({
   data,
+  health,
   seed,
   onLedgerChanged,
   onSeedConsumed,
 }: {
   data?: Dashboard;
+  health: LedgerHealthState;
   seed?: { text: string; nonce: number; autoSend?: boolean };
   onLedgerChanged: () => void;
   onSeedConsumed: () => void;
@@ -282,6 +285,7 @@ export function Chat({
                     canSave={!turn.running && !turn.error}
                     key={position}
                     onLanded={(landed) => land(index, position, landed)}
+                    onUndone={onLedgerChanged}
                     onEdited={(updated) => { if (generation.current !== renderedGeneration) return; setTurns((items) => items.map((item, turnIndex) =>
                       turnIndex === index ? { ...item, receipts: item.receipts.map((old, slot) => slot === position ? updated : old) } : item
                     )); }}
@@ -340,7 +344,7 @@ export function Chat({
         </div>
       </section>
 
-      <LedgerPanel receipt={lastWrite} data={data} file={lastWrite?.file ?? "ledger/"} />
+      <LedgerPanel receipt={lastWrite} data={data} health={health} file={lastWrite?.file ?? "ledger/"} />
     </div>
   );
 }
