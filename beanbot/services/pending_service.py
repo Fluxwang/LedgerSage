@@ -28,7 +28,6 @@ class PendingWriteService:
         self.database = database
         self.ledgers = ledgers
         self.vectors = vectors
-        self._confirming: set[str] = set()
 
     def _load(self, user: dict, pending_id: str) -> dict:
         """取出当前用户一条仍可操作的待确认写入，edit / confirm / reject 都先经过这里。
@@ -43,11 +42,11 @@ class PendingWriteService:
             LedgerWriteConflict: 正在 confirm 中（防止连点重复写入）、已是终态（confirmed / rejected / expired），或刚刚过期
             NotFound: 找不到，或不属于当前用户
         """
-        if pending_id in self._confirming:
-            raise LedgerWriteConflict("正在确认这条写入，请稍后重试")
         record = self.database.pending(pending_id, user["id"])
         if not record:
             raise NotFound("找不到这条待确认写入")
+        if record["status"] == "confirming":
+            raise LedgerWriteConflict("正在确认这条写入，请稍后重试")
         if record["status"] != "pending":
             raise LedgerWriteConflict(
                 f"这条写入已经{STATUS_LABELS[record['status']]}了"
@@ -131,7 +130,7 @@ class PendingWriteService:
 
     async def confirm(self, user: dict, pending_id: str) -> dict:
         """确认一条待确认写入：落盘到账本并提交 git，成功后标记为 'confirmed'。
-        确认期间 pending_id 放在 _confirming 里，防止连点重复写入
+        落盘前先在库里把状态抢成 'confirming'：连点和删除对话都改不动它，失败时退回 'pending'
         Args:
             user: 当前用户
             pending_id: 待确认写入的id.
@@ -143,11 +142,13 @@ class PendingWriteService:
             NotFound: 同 _load
         """
         record = self._load(user, pending_id)
-        self._confirming.add(pending_id)
+        if not self.database.claim_pending(pending_id, user["id"]):
+            raise LedgerWriteConflict("这条写入的状态刚刚变了，请刷新后重试")
         try:
             return await self._confirm(user, pending_id, record)
-        finally:
-            self._confirming.discard(pending_id)
+        except BaseException:
+            self.database.release_pending(pending_id)
+            raise
 
     async def _confirm(self, user: dict, pending_id: str, record: dict) -> dict:
         ledger = self.ledgers.get(user)
@@ -167,7 +168,9 @@ class PendingWriteService:
                 Decimal(str(payload["amount"])),
                 payload.get("period", "monthly"),
             ) | {"account": payload["account"]}
-        self.database.resolve_pending(pending_id, "confirmed", receipt["commit"])
+        self.database.resolve_pending(
+            pending_id, "confirmed", receipt["commit"], from_status="confirming"
+        )
         return receipt | {"pending_id": pending_id, "status": "confirmed"}
 
     def reject(self, user: dict, pending_id: str) -> dict:

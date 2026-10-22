@@ -1,4 +1,5 @@
 """两段式写入：Agent 只产出 diff，落盘由用户确认（ADR 0012）。"""
+import asyncio
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -204,3 +205,27 @@ def test_reject_endpoint_discards_the_preview(tmp_path):
         assert rejected.json()['status'] == 'rejected'
         assert client.post(f"/chat/pending/{receipt['pending_id']}/confirm", headers=headers).status_code == 409
         assert client.get('/transactions', headers=headers).json()['total'] == 0
+
+async def test_delete_session_while_confirm_waits_for_ledger_lock_keeps_audit_consistent(tmp_path):
+    database, user, ledgers = prepared(tmp_path)
+    service = PendingWriteService(database, ledgers)
+    session = database.session(user['id'], 'race', '火锅128')
+    run = database.create_run(session, user['id'], 'fixture', '火锅128')
+    pending = database.create_pending(user['id'], run['id'], 'record',
+                                      {'transactions': [transaction().model_dump(mode='json')]})
+    ledger = ledgers.get(user)
+    # 先占住账本锁，让 confirm 停在写入前，再在这个空档里删除对话。
+    async with ledger._lock:
+        task = asyncio.create_task(service.confirm(user, pending['id']))
+        await asyncio.sleep(0)
+        database.delete_session(user['id'], 'race')
+    try:
+        await task
+    except LedgerWriteConflict:
+        pass
+    record = database.pending(pending['id'], user['id'])
+    # 账本和数据库必须一致：要么确认成功并留下 SHA，要么作废且账本没写入。
+    if ledger.transactions:
+        assert record['status'] == 'confirmed' and record['commit_sha']
+    else:
+        assert record['status'] == 'rejected' and record['commit_sha'] is None

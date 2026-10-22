@@ -44,6 +44,9 @@ class Database:
             db.execute(
                 "UPDATE runs SET status='interrupted' WHERE status='running'"
             )  # 将异常退出留下的 running 记录改为 interrupted
+            db.execute(
+                "UPDATE pending_writes SET status='pending' WHERE status='confirming'"
+            )  # 确认途中进程退出，退回 pending 让用户重新确认
 
     @contextmanager
     # with 要求后面的对象是上下文管理器, 所以要加上 contextmanager
@@ -193,18 +196,38 @@ class Database:
         rows[0]["payload"] = json.loads(rows[0]["payload"])
         return rows[0]
 
+    def claim_pending(self, pending_id: str, user_id: str) -> bool:
+        """把 pending 原子地改成 confirming，抢到返回 True。"""
+        with self.connect() as db:
+            return db.execute(
+                "UPDATE pending_writes SET status='confirming' WHERE id=? AND user_id=? AND status='pending'",
+                (pending_id, user_id),
+            ).rowcount == 1
+
+    def release_pending(self, pending_id: str) -> None:
+        """落盘失败时把 confirming 退回 pending，允许重试。"""
+        self.execute(
+            "UPDATE pending_writes SET status='pending' WHERE id=? AND status='confirming'",
+            (pending_id,),
+        )
+
     def resolve_pending(
-        self, pending_id: str, status: str, commit: str | None = None
+        self,
+        pending_id: str,
+        status: str,
+        commit: str | None = None,
+        from_status: str = "pending",
     ) -> None:
         """把一条待确认写入标记为终态，并记下结案时间。只改 status / commit_sha / resolved_at，不动 payload
         Args:
             pending_id: 待确认写入的id.
             status: 终态，'confirmed' / 'rejected' / 'expired' 之一
             commit: 写入账本后的 git 提交 sha，只有 confirmed 时传入，其余为 None
+            from_status: 只有当前状态等于它时才更新；confirmed 由 'confirming' 转来
         """
         self.execute(
             "UPDATE pending_writes SET status=?,commit_sha=?,resolved_at=? WHERE id=? AND status=?",
-            (status, commit, now(), pending_id, "pending"),
+            (status, commit, now(), pending_id, from_status),
         )
 
     def session(self, user_id: str, thread_id: str, message: str = "") -> dict:
