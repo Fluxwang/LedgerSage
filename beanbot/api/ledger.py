@@ -9,6 +9,8 @@ from pydantic import Field
 
 from beanbot.api.auth import CurrentUser
 from beanbot.gateways.ledger import Ledger, period_bounds
+from beanbot.gateways.ledger.repo import ledger_root
+from beanbot.gateways.ledger.status import ledger_status
 
 router = APIRouter()
 
@@ -41,6 +43,12 @@ def shape(row: dict) -> dict:
 
 def user_ledger(request: Request, user: dict) -> Ledger:
     return request.app.state.ledgers.get(user)
+
+
+@router.get("/ledger/status")
+def status(request: Request, user: CurrentUser):
+    """独立检查磁盘上的账本，损坏的账本仍返回可读的体检结果。"""
+    return ledger_status(ledger_root(request.app.state.settings, user))
 
 
 def trend_months(today: date, count: int = TREND_MONTHS) -> list[date]:
@@ -155,6 +163,7 @@ async def dashboard(
         for month in months
     }
     categories = ledger.expense_totals(start, end)
+    payees = ledger.payee_expenses(start, end)
     dawn = date(1970, 1, 1)
     total = sum(
         1 for transaction in ledger.transactions if dawn <= transaction.date <= today
@@ -162,6 +171,12 @@ async def dashboard(
     rows = ledger.query_transactions(dawn, today, limit=page * PAGE_SIZE)
     return {
         "accounts": cards,
+        "top_payees": [
+            {"payee": payee, "amount": str(amount)}
+            for payee, amount in sorted(
+                payees.items(), key=lambda item: (-item[1], item[0])
+            )[:10]
+        ],
         "monthly_trend": [
             {"month": key, "amount": str(amount)} for key, amount in trend.items()
         ],

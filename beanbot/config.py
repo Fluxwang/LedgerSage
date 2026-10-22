@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # extra="ignore" 当环境变量和.env都存在的时候，进行ignore 而不进行 forbid报错处理
+    # extra="ignore" .env中出现未定义的字段时忽略
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     data_dir: Path = Path("data")
     ledger_root: Path = Path("data/ledgers")

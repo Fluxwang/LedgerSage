@@ -2,10 +2,11 @@ import { useState } from "react";
 import { accounts as fetchAccounts, type Dashboard } from "../api";
 import { abs, Async, Bar, budgetState, BUDGET_LABEL, Meter, monthLabel, num, Stub, useAsync } from "../ui";
 import type { WriteReceipt } from "./Results";
+import type { LedgerHealthState } from "../shell/LedgerHealth";
 
 type Tab = "ledger" | "accounts" | "charts";
 
-function Diff({ receipt }: { receipt: WriteReceipt }) {
+function Diff({ receipt, health }: { receipt: WriteReceipt; health: LedgerHealthState }) {
   const lines = receipt.added_lines ?? receipt.text.split("\n");
   return (
     <div className="pcard">
@@ -34,7 +35,23 @@ function Diff({ receipt }: { receipt: WriteReceipt }) {
             </div>
           ))}
         </div>
-        <Stub endpoint="GET /ledger/status" why="bean-check 的结果目前还没有端点可查。" />
+        <BeanCheck health={health} />
+      </div>
+    </div>
+  );
+}
+
+/** 账本此刻的 bean-check 结果，复用顶栏已取到的账本健康度；只提示，不拦确认（ADR 0012）。 */
+function BeanCheck({ health }: { health: LedgerHealthState }) {
+  const check = health.data?.bean_check;
+  if (health.loading) return <div className="checks"><div><span>…</span>bean-check 读取中</div></div>;
+  if (health.error || !check)
+    return <div className="checks"><div><span className="warn">!</span>bean-check 读取失败：{String((health.error as Error | undefined)?.message ?? "无数据")}</div></div>;
+  return (
+    <div className="checks">
+      <div>
+        <span className={check.ok ? "ok" : "warn"}>{check.ok ? "✓" : "!"}</span>
+        {check.ok ? "bean-check 通过" : check.message}
       </div>
     </div>
   );
@@ -156,10 +173,12 @@ function Charts({ data }: { data: Dashboard }) {
 export function LedgerPanel({
   receipt,
   data,
+  health,
   file,
 }: {
   receipt?: WriteReceipt;
   data?: Dashboard;
+  health: LedgerHealthState;
   file: string;
 }) {
   const [tab, setTab] = useState<Tab>("ledger");
@@ -183,7 +202,7 @@ export function LedgerPanel({
         {tab === "ledger" && (
           <>
             {receipt ? (
-              <Diff receipt={receipt} />
+              <Diff receipt={receipt} health={health} />
             ) : (
               <div className="hollow">这一栏常驻账本原文。记一笔之后，这里会先显示将要写进去的那几行。</div>
             )}
