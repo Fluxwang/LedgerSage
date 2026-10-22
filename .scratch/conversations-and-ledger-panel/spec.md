@@ -1,9 +1,9 @@
-# 对话列表菜单、右栏账本占位收尾、统计页去掉两个空 tab
+# 对话列表菜单、右栏账本占位收尾、统计页去掉两个空 tab、查询账户前缀修复
 
 Status: ready-for-agent
 Branch: feat/conversations-and-ledger-panel
 
-术语以 [`CONTEXT.md`](../../CONTEXT.md) 为准。本期新增的术语有两个：**对话 (Conversation)** 和 **写入历史 (Write History)**。本期不新增 ADR。实现拆成 5 张票，放在 [`issues/`](issues/) 下。
+术语以 [`CONTEXT.md`](../../CONTEXT.md) 为准。本期新增的术语有两个：**对话 (Conversation)** 和 **写入历史 (Write History)**。本期还在「账户」词条里补充了按段匹配的规则。本期不新增 ADR。实现拆成 9 张票，放在 [`issues/`](issues/) 下。
 
 ## Problem Statement
 
@@ -12,6 +12,7 @@ Branch: feat/conversations-and-ledger-panel
   - `GET /ledger/raw`：「写入位置上下文与查询命中的原始条目」。
   - `GET /ledger/history`：「写入历史」。
 - diff 卡只显示将要写入的那几行，用户看不到它会接在哪笔交易后面。尤其在「疑似重复」提示出现时，用户还得自己去翻账本。
+- 问「这个月餐饮花了多少」时，Agent 回答「这个范围内没有找到记录」。原因是查询时模型看不到账户表，编造了 `Expenses:Dining`，而真名是 `Expenses:Food:Dining`。空结果的回复既不写账户也不写日期，用户只有展开工具参数才能发现问题，会误以为这个月真的没花钱。
 - 统计页的子导航里，「持仓」和「BQL 查询」是两个永远点不了的灰色 tab。这两个功能已经确定不做：持仓超出范围，BQL 见 ADR 0006。
 
 ## Solution
@@ -22,6 +23,7 @@ Branch: feat/conversations-and-ledger-panel
 - 新对话的自动标题缩短为第一句话的前 10 个字。
 - diff 卡在绿色的 `+` 行上方，用灰色显示插入点之前的几行已有原文。
 - 「写入历史」卡片按时间倒序，只读地列出 LedgerSage 最近替用户做过的写入，并标明哪些已经被撤销。
+- 查询时把账户表交给模型；账户前缀按段匹配；前缀不存在时如实回答，并给出相近的账户；回复里写明查的是哪段时间、哪个账户。
 - 删掉 `/ledger/raw` 的占位卡片，以及「持仓」「BQL 查询」两个 tab。
 
 ## User Stories
@@ -66,10 +68,18 @@ Branch: feat/conversations-and-ledger-panel
 30. 作为在统计页删除或撤销过交易的用户，我希望回到对话页时写入历史已经是最新的。
 31. 作为从 BeanChat 时代迁过来的用户，我希望旧前缀的提交也能出现在写入历史里。
 
+### 查询账户前缀
+
+32. 作为用户，我问「这个月餐饮花了多少」时，希望 Agent 按我账本里真实的餐饮账户去查。
+33. 作为用户，我希望问「食物」相关的开销时，不会把名字恰好以 Food 开头的其他账户也算进来。
+34. 作为用户，我希望 Agent 用了一个账本里不存在的账户时，直接告诉我「没有这个账户」，而不是告诉我「没有记录」。
+35. 作为用户，我希望在 Agent 找错账户时，它能给出我可能想查的那个账户。
+36. 作为用户，我希望查询回复写明查的是哪段时间、哪个账户，这样它理解错了我一眼就能看出来。
+
 ### 清理
 
-32. 作为用户，我希望右栏不再出现「这块还等后端 GET /ledger/raw」这张空卡。
-33. 作为用户，我希望统计页不再出现永远点不了的「持仓」和「BQL 查询」。
+37. 作为用户，我希望右栏不再出现「这块还等后端 GET /ledger/raw」这张空卡。
+38. 作为用户，我希望统计页不再出现永远点不了的「持仓」和「BQL 查询」。
 
 ## Implementation Decisions
 
@@ -141,6 +151,23 @@ ledger_history_limit: int = Field(default=10, ge=1, le=100)            # 写入�
 
 - 删除 `Explore.tsx` 子导航里「持仓」和「BQL 查询」两个 `div.off`，以及 `explore.css` 里的 `.subnav .off` 样式。
 
+### 查询账户前缀
+
+- `AgentModel.query` 的签名改为 `query(message, accounts, today)`，`accounts` 的格式和 `extract()` 一样，都是 `(账户, 显示名)` 列表，去掉 `Equity:` 开头的账户。提示词要求 `account_prefix` 必须是其中某个账户，或它按段计算的前缀。
+- 新增两个函数，所有地方都调用它们：
+  - 规范化前缀：先去掉首尾空白，再去掉末尾的 `:`；结果为空串时视为不筛选。
+  - 判断账户是否落在前缀下：账户 `== p`，或者以 `p + ":"` 开头。
+- `query.py` 的两处正则改为 `^前缀(:|$)`；`ledger.py` 中 `query_transactions` 的 `startswith` 和 `graph.py` 中 `list_accounts` 的 `startswith` 都改用上面的按段判断。
+- 校验：`query_transactions`、`get_balance`、`list_accounts` 执行前，先检查前缀下面有没有已开户的账户。没有的话就不执行查询，回复由代码生成，不调用 LLM：
+  - 有候选时：「账本里没有 `X` 这个账户。你是不是想查：显示名（账户）？」
+  - 没有候选时：「账本里没有 `X` 这个账户，可以问我『我有哪些账户』。」
+  - 候选的生成顺序：先找显示名在用户原话里出现过的账户，再用 `difflib.get_close_matches` 补足（cutoff 0.6）。去重后最多 3 个，`Equity:` 开头的不参与。
+- 这一期不转成追问：追问恢复后会重新分类意图，现在没有「带着选中的账户回到查询」的路径。
+- 回复要写明查询口径：
+  - 空结果：「起 至 止，显示名（前缀）没有记录。」
+  - 有结果：「起 至 止，显示名（前缀）共 N 笔，支出合计 X。」
+  - 显示名取前缀对应账户 `open` 指令上的 `name:`，取不到就只显示前缀。没有筛选时不提账户。
+
 ### 跨切面
 
 - 所有新端点都通过现有的当前用户依赖做鉴权，数据按 `user_id` 隔离（ADR-0005）。
@@ -157,6 +184,7 @@ ledger_history_limit: int = Field(default=10, ge=1, le=100)            # 写入�
   - 上文：在非空文件里预览，`context_before` 的末行就是插入点前的原文；空文件返回 `[]`；插入点前全是空行时，会继续往上取到非空内容；预算预览也带上文。
   - 写入历史：record、budget、delete 三种都会出现，而且是倒序；撤销之后原条目带 `undone_at`，撤销提交本身不出现；手工提交和 `initialize ledger` 不出现；`BeanChat:` 前缀的提交会出现；超过 limit 时被截断；摘要格式正确。
   - 迁移：`005` 能在已有数据库上升级。
+  - 查询账户前缀：`query()` 收到的是不含 `Equity:` 的账户表；按段匹配不会命中 `Expenses:FoodDelivery`，`Expenses:` 等价于 `Expenses`；不存在的前缀不会执行查询，而是返回账户不存在的回复和候选，三个工具都一样；回复文案在带显示名、分组前缀、没有筛选三种情况下都正确。这部分是图层面的行为，按 `test_graph.py` 的方式用 FixtureModel 驱动。
 - 参考的现有测试：`test_sessions.py`、`test_pending_writes.py`、`test_delete_transaction.py`、`test_ledger_status.py`、`test_migration.py`。
 - 前端：仍然只用 `npm run build` 做类型检查，再加每张票里的手工验证。
 
@@ -169,8 +197,9 @@ ledger_history_limit: int = Field(default=10, ge=1, le=100)            # 写入�
 - 对话的置顶、分组、搜索、分页，以及用 LLM 自动生成标题。
 - 回填已有对话的标题。
 - 写入历史里列出用户的手工提交。
+- 查询时账户不存在转成追问，以及按 payee 查询的同类问题（payee 目前是包含匹配，不在本期范围）。
 
 ## Further Notes
 
-- 拆成 5 张票：01 对话重命名，02 对话删除（依赖 01 的「⋯」菜单），03 diff 卡上文，04 写入历史，05 统计页去掉两个空 tab。除 02 外都可以直接开始。
+- 拆成 9 张票：01 对话重命名，02 对话删除（依赖 01 的「⋯」菜单），03 diff 卡上文，04 写入历史，05 统计页去掉两个空 tab，06 查询提示词带上账户表，07 账户前缀规范化与按段匹配，08 前缀不存在时如实回答（依赖 07），09 查询回复写明口径（依赖 07）。除 02、08、09 外都可以直接开始。
 - 全部完成后，把本目录 `git mv` 到 `docs/archive/conversations-and-ledger-panel/`。
