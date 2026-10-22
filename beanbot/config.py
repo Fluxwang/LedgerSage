@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     clarification_candidate_limit: int = Field(default=12, ge=1, le=100)
     intent_threshold: float = Field(default=0.6, ge=0, le=1)
     ledger_cache_size: int = Field(default=64, ge=1)
+    conversation_title_max_length: int = Field(default=40, ge=1, le=200)
+    conversation_title_auto_length: int = Field(default=10, ge=1, le=200)
 
     @property
     def database_path(self) -> Path:

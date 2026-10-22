@@ -44,6 +44,7 @@ async function api<T = any>(path: string, options: RequestInit = {}): Promise<T>
     const detail = await response.json().catch(() => ({}));
     throw new Error(detail.detail || `请求失败（${response.status}）`);
   }
+  if (response.status === 204) return undefined as T;
   return response.json();
 }
 
@@ -143,11 +144,19 @@ export const editWrite = (id: string, transactionIndex: number, field: "from_acc
     method: "PATCH", body: JSON.stringify({ transaction_index: transactionIndex, [field]: account }),
   });
 
-export type Session = { thread_id: string; title: string; last_active_at: string; has_pending_ask: boolean };
+export type Session = { thread_id: string; title: string; last_active_at: string; has_pending_ask: boolean; pending_write_count: number };
 
 /** 最近 30 个对话，选择后沿用原来的 thread_id。 */
 export const sessions = (): Promise<Session[]> =>
   api("/sessions");
+
+export const renameSession = (threadId: string, title: string) =>
+  api<{ thread_id: string; title: string }>(`/sessions/${encodeURIComponent(threadId)}`, {
+    method: "PATCH", body: JSON.stringify({ title }),
+  });
+
+export const deleteSession = (threadId: string) =>
+  api<void>(`/sessions/${encodeURIComponent(threadId)}`, { method: "DELETE" });
 
 export type SessionReplay = { active_run_id: string | null; pending_at: string | null; has_pending_ask: boolean; ask_expired: boolean; runs: any[] };
 export const sessionRuns = (threadId: string): Promise<SessionReplay> =>
