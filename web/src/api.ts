@@ -44,6 +44,7 @@ async function api<T = any>(path: string, options: RequestInit = {}): Promise<T>
     const detail = await response.json().catch(() => ({}));
     throw new Error(detail.detail || `请求失败（${response.status}）`);
   }
+  if (response.status === 204) return undefined as T;
   return response.json();
 }
 
@@ -120,11 +121,16 @@ export type LedgerStatus = {
 /** 顶栏与右栏共用的账本健康度，独立于仪表盘和统计区间。 */
 export const ledgerStatus = () => api<LedgerStatus>("/ledger/status");
 
-export type LedgerSlice = { file: string; start_line: number; lines: string[] };
+export type LedgerHistoryEntry = {
+  commit: string;
+  kind: "record" | "budget" | "delete";
+  summary: string;
+  file: string;
+  committed_at: string;
+  undone_at: string | null;
+};
 
-/** 右栏「即将写入的 diff」上下文，以及「查询命中的原始条目」。 */
-export const ledgerSlice = (_params: { file?: string; around?: number; context?: number }): Promise<LedgerSlice> =>
-  pending("GET /ledger/raw", "右栏要展示写入位置前后的账本原文");
+export const ledgerHistory = () => api<LedgerHistoryEntry[]>("/ledger/history");
 
 export type Validation = { level: "ok" | "warn"; text: string };
 
@@ -143,11 +149,19 @@ export const editWrite = (id: string, transactionIndex: number, field: "from_acc
     method: "PATCH", body: JSON.stringify({ transaction_index: transactionIndex, [field]: account }),
   });
 
-export type Session = { thread_id: string; title: string; last_active_at: string; has_pending_ask: boolean };
+export type Session = { thread_id: string; title: string; last_active_at: string; has_pending_ask: boolean; pending_write_count: number };
 
 /** 最近 30 个对话，选择后沿用原来的 thread_id。 */
 export const sessions = (): Promise<Session[]> =>
   api("/sessions");
+
+export const renameSession = (threadId: string, title: string) =>
+  api<{ thread_id: string; title: string }>(`/sessions/${encodeURIComponent(threadId)}`, {
+    method: "PATCH", body: JSON.stringify({ title }),
+  });
+
+export const deleteSession = (threadId: string) =>
+  api<void>(`/sessions/${encodeURIComponent(threadId)}`, { method: "DELETE" });
 
 export type SessionReplay = { active_run_id: string | null; pending_at: string | null; has_pending_ask: boolean; ask_expired: boolean; runs: any[] };
 export const sessionRuns = (threadId: string): Promise<SessionReplay> =>

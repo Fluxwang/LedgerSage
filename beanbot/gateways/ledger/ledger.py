@@ -23,6 +23,7 @@ from beanbot.config import Settings
 from beanbot.exceptions import AccountNotFound, LedgerWriteConflict, NotFound
 from beanbot.gateways.ledger.ids import decode_transaction_id, encode_transaction_id
 from beanbot.gateways.ledger.inputs import TransactionInput
+from beanbot.gateways.ledger.accounts import account_matches, normalize_prefix
 from beanbot.gateways.ledger.periods import BUDGET_PERIODS, period_bounds, today as _today
 from beanbot.gateways.ledger.repo import (
     commit_only, git, init_repo, ledger_root, scaffold_ledger,
@@ -30,9 +31,10 @@ from beanbot.gateways.ledger.repo import (
 
 
 class Ledger:
-    def __init__(self, root: Path, user_id: str):
+    def __init__(self, root: Path, user_id: str, context_lines: int = 5):
         self.root = root.resolve()
         self.user_id = user_id
+        self.context_lines = context_lines
         self._lock = asyncio.Lock()
         self.reload()
 
@@ -111,6 +113,7 @@ class Ledger:
         max_amount: Decimal | None = None,
         group_by: str = "none",
     ) -> list[dict]:
+        account_prefix = normalize_prefix(account_prefix)
         result: list[dict[str, Any]] = []
         for transaction in reversed(self.transactions):
             if not start <= transaction.date <= end:
@@ -120,7 +123,7 @@ class Ledger:
             postings = [
                 posting
                 for posting in transaction.postings
-                if not account_prefix or posting.account.startswith(account_prefix)
+                if account_matches(posting.account, account_prefix)
             ]
             if account_prefix and not postings:
                 continue
@@ -192,7 +195,7 @@ class Ledger:
             if as_of and transaction.date > as_of:
                 continue
             for posting in transaction.postings:
-                if not posting.account.startswith(prefix) or not posting.units:
+                if not account_matches(posting.account, prefix) or not posting.units:
                     continue
                 currencies = totals.setdefault(posting.account, {})
                 number = cast(Decimal, posting.units.number)
@@ -415,10 +418,18 @@ class Ledger:
             directory /= "0-default"
         return directory / f"{current.month:02d}-expenses.bean"
 
-    def _insert_position(self, relative: Path) -> int:
+    def _preview_position(self, relative: Path) -> dict:
+        """上文包含追加时的分隔空行，使原文与新增行的行号连续。"""
         target = self.root / relative
-        existing = target.read_text(encoding="utf-8") if target.exists() else ""
-        return existing.count("\n") + (2 if existing else 1)
+        existing = target.read_text(encoding='utf-8') if target.exists() else ''
+        before = (existing + '\n').splitlines() if existing else []
+        start = max(0, len(before) - self.context_lines)
+        if self.context_lines and not any(line.strip() for line in before[start:]):
+            start = next((i for i in range(start - 1, -1, -1) if before[i].strip()), 0)
+        return {
+            'insert_at_line': existing.count('\n') + (2 if existing else 1),
+            'context_before': before[start:] if self.context_lines else [],
+        }
 
     def preview(
         self, transactions: Iterable[TransactionInput], today: date | None = None
@@ -434,7 +445,7 @@ class Ledger:
         return {
             "kind": "record",
             "file": relative.as_posix(),
-            "insert_at_line": self._insert_position(relative),
+            **self._preview_position(relative),
             "entries": rendered,
             "text": text,
             "added_lines": text.split("\n"),
@@ -467,6 +478,7 @@ class Ledger:
         effective_date: date | None = None,
         currency: str = "CNY",
     ) -> dict:
+        self.reload()
         self._validate_budget(account, amount, period)
         line = self.budget_line(account, amount, period, effective_date, currency)
         current = next(
@@ -490,7 +502,7 @@ class Ledger:
             "kind": "budget",
             "account": account,
             "file": "budgets.bean",
-            "insert_at_line": self._insert_position(Path("budgets.bean")),
+            **self._preview_position(Path("budgets.bean")),
             "entries": [line],
             "text": line,
             "added_lines": [line],
@@ -741,7 +753,7 @@ class LedgerFactory:
                 init_repo(root)
         elif not (root / "main.bean").exists():
             scaffold_ledger(root)
-        ledger = Ledger(root, user_id)
+        ledger = Ledger(root, user_id, self.settings.ledger_context_lines)
         if ledger.errors:
             raise LedgerWriteConflict(f"账本无法加载：{ledger.errors[0]}")
         self._cache[user_id] = ledger

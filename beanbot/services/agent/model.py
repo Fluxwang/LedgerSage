@@ -39,7 +39,7 @@ class AgentModel(Protocol):
         examples: list[str],
         today: date,
     ) -> ExtractBatch: ...
-    async def query(self, message: str, today: date) -> QueryPlan: ...
+    async def query(self, message: str, accounts: list[tuple[str, str | None]], today: date) -> QueryPlan: ...
     async def budget(
         self, message: str, accounts: list[tuple[str, str | None]]
     ) -> BudgetPlan: ...
@@ -79,12 +79,14 @@ class OpenAIAgentModel:
         )
         return ExtractBatch.model_validate(await runnable.ainvoke(prompt))
 
-    async def query(self, message: str, today: date) -> QueryPlan:
+    async def query(self, message: str, accounts: list[tuple[str, str | None]], today: date) -> QueryPlan:
         runnable = self.chat.with_structured_output(QueryPlan)
         return QueryPlan.model_validate(
             await runnable.ainvoke(
                 "选择固定工具 query_transactions/get_balance/list_accounts/budget_status 并填写参数。"
                 "问预算还剩多少、超没超时用 budget_status。"
+                "account_prefix 必须是账户表里的真实账户，或其按冒号分段的前缀，不得编造账户。"
+                f"账户（账户名，显示名）：{accounts}。"
                 f"今天是 {today.isoformat()}。不得生成 BQL。问题：{message}"
             )
         )

@@ -1,11 +1,12 @@
 import "./chat.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { clearToken, type Dashboard, token, sessions, sessionRuns, type Session, type SessionReplay } from "../api";
+import { clearToken, deleteSession, type Dashboard, token, sessions, sessionRuns, type Session, type SessionReplay } from "../api";
 import { abs, num } from "../ui";
 import { LedgerPanel } from "./LedgerPanel";
 import type { LedgerHealthState } from "../shell/LedgerHealth";
 import { classify, ReceiptCard, type Receipt, type WriteReceipt } from "./Results";
 import { type Step, ToolTrace, traceSummary } from "./ToolTrace";
+import { ConversationItem } from "./ConversationItem";
 
 type Turn = {
   said?: string;
@@ -86,15 +87,44 @@ export function Chat({
   const [loading, setLoading] = useState(false);
   const [pendingAsk, setPendingAsk] = useState(false);
   const generation = useRef(0);
+  const historyRequest = useRef(0);
+  const currentThread = useRef(thread);
+  currentThread.current = thread;
   const renderedGeneration = generation.current;
   const stream = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
 
   async function refreshHistory() {
-    try { setHistory(await sessions()); setHistoryError(""); }
-    catch (error) { setHistoryError((error as Error).message); }
+    const request = ++historyRequest.current;
+    try {
+      const rows = await sessions();
+      if (request === historyRequest.current) { setHistory(rows); setHistoryError(""); }
+    } catch (error) { if (request === historyRequest.current) setHistoryError((error as Error).message); }
   }
   useEffect(() => { void refreshHistory(); }, []);
+
+  function newConversation() {
+    generation.current++;
+    setLoading(false); setPendingAsk(false); setText("");
+    setTurns([]);
+    const id = crypto.randomUUID();
+    currentThread.current = id;
+    setThread(id);
+  }
+
+  async function removeConversation(id: string) {
+    // 确认或丢弃写入后笔数可能变化，弹框之前重新读取当前状态。
+    const latest = await sessions();
+    const item = latest.find((row) => row.thread_id === id);
+    if (!item) throw new Error("对话不存在，请刷新列表");
+    const pending = item.pending_write_count > 0
+      ? `\n其中 ${item.pending_write_count} 笔待确认的记账会一并丢弃。` : "";
+    if (!window.confirm(`删除对话「${item.title}」？账本不受影响。${pending}`)) return;
+    await deleteSession(id);
+    historyRequest.current++;
+    setHistory((items) => items.filter((row) => row.thread_id !== id));
+    if (currentThread.current === id) newConversation();
+  }
 
   async function openSession(id: string) {
     if (running) return;
@@ -130,7 +160,7 @@ export function Chat({
 
   const lastWrite = useMemo(() => {
     for (let index = turns.length - 1; index >= 0; index--) {
-      const write = [...turns[index].receipts].reverse().find((receipt) => receipt.kind === "write");
+      const write = [...turns[index].receipts].reverse().find((receipt) => (receipt.kind === "write" || receipt.kind === "budget"));
       if (write) return write as WriteReceipt;
     }
     return undefined;
@@ -139,6 +169,7 @@ export function Chat({
   /** 确认写入之后把回执换成落盘后的那份，右栏跟着从「即将写入」变成「已写入」。 */
   const land = (turnIndex: number, position: number, landed: { commit: string; file: string; line: number }) => {
     onLedgerChanged();
+    void refreshHistory();
     if (generation.current !== renderedGeneration) return;
     setTurns((items) =>
       items.map((turn, index) =>
@@ -177,6 +208,10 @@ export function Chat({
         clearToken();
         location.reload();
         return;
+      }
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || `请求失败（${response.status}）`);
       }
       if (!response.body) throw new Error("服务端没有返回事件流");
       for await (const event of frames(response.body)) {
@@ -227,19 +262,24 @@ export function Chat({
           <button
             className="rail-item"
             disabled={running}
-            onClick={() => {
-              generation.current++;
-              setLoading(false); setPendingAsk(false); setText("");
-              setTurns([]);
-              setThread(crypto.randomUUID());
-            }}
+            onClick={newConversation}
           >
             ＋ 新对话
           </button>
-          {history.map((item) => <button key={item.thread_id} className={`rail-item${item.thread_id === thread ? " on" : ""}`}
-            disabled={running} onClick={() => void openSession(item.thread_id)}>
-            {item.title}{item.has_pending_ask ? " · 待答复" : ""}
-          </button>)}
+          {history.map((item) => (
+            <ConversationItem
+              key={item.thread_id}
+              item={item}
+              active={item.thread_id === thread}
+              running={running}
+              onOpen={() => void openSession(item.thread_id)}
+              onRenamed={(title) => {
+                historyRequest.current++;
+                setHistory((items) => items.map((row) => row.thread_id === item.thread_id ? { ...row, title } : row));
+              }}
+              onDelete={() => removeConversation(item.thread_id)}
+            />
+          ))}
           {historyError && <div className="failed" role="alert">{historyError}</div>}
         </div>
         <div className="rail-group">

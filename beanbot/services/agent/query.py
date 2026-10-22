@@ -6,6 +6,7 @@ from datetime import date, timedelta
 import re
 from typing import Literal
 from pydantic import BaseModel, Field, model_validator
+from beanbot.gateways.ledger.accounts import normalize_prefix
 
 
 class DateRange(BaseModel):
@@ -75,8 +76,9 @@ def quote_bql(value: str) -> str:
 
 def build_transaction_bql(query: TransactionQuery) -> str:
     clauses = [f"date >= {query.start.isoformat()}", f"date <= {query.end.isoformat()}"]
-    if query.account_prefix:
-        clauses.append(f"account ~ {quote_bql('^' + re.escape(query.account_prefix))}")
+    prefix = normalize_prefix(query.account_prefix)
+    if prefix:
+        clauses.append(f"account ~ {quote_bql('^' + re.escape(prefix) + '(:|$)')}")
     if query.payee:
         clauses.append(f"payee ~ {quote_bql(re.escape(query.payee))}")
     if query.min_amount is not None:
@@ -88,9 +90,11 @@ def build_transaction_bql(query: TransactionQuery) -> str:
 
 
 def build_balance_bql(account_prefix: str, as_of: date) -> str:
+    prefix = normalize_prefix(account_prefix)
+    account_clause = f"account ~ {quote_bql('^' + re.escape(prefix) + '(:|$)')} AND " if prefix else ''
     return (
         "SELECT account, sum(position) "
-        f"WHERE account ~ {quote_bql('^' + re.escape(account_prefix))} AND date <= {as_of.isoformat()} "
+        f"WHERE {account_clause}date <= {as_of.isoformat()} "
         "GROUP BY account"
     )
 

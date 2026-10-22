@@ -43,6 +43,64 @@
   background: var(--green-wash);
   color: var(--ink);
 }
+.conversation-item {
+  position: relative;
+  min-width: 0;
+}
+.conversation-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.conversation-row > .rail-item {
+  padding-right: 30px;
+}
+.conversation-more {
+  position: absolute;
+  right: 3px;
+  width: 25px;
+  height: 25px;
+  border-radius: 5px;
+  font-size: 19px;
+  line-height: 1;
+  opacity: 0;
+}
+.conversation-item:hover .conversation-more,
+.conversation-item:focus-within .conversation-more,
+.conversation-item.active .conversation-more {
+  opacity: 1;
+}
+.conversation-more:hover {
+  background: var(--wash);
+}
+.conversation-more:disabled {
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+.conversation-menu {
+  top: 32px;
+}
+.conversation-menu .conversation-delete {
+  color: var(--red);
+}
+.conversation-title {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  background: var(--raise);
+  font-size: 12.5px;
+}
+.conversation-error {
+  margin-top: 4px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+@media (hover: none) {
+  .conversation-more { opacity: 1; }
+}
 .rail-row {
   display: flex;
   justify-content: space-between;
@@ -602,4 +660,23 @@
   gap: 8px;
   font: 11px var(--mono);
   color: var(--ink-1);
+}
+
+.diff .context {
+  color: var(--ink-3);
+  display: block;
+}
+.write-history-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.write-history-row + .write-history-row {
+  border-top: 1px solid var(--line);
+}
+.write-history-row.undone {
+  color: var(--ink-3);
 }

@@ -11,6 +11,8 @@ from beanbot.api.auth import CurrentUser
 from beanbot.gateways.ledger import Ledger, period_bounds
 from beanbot.gateways.ledger.repo import ledger_root
 from beanbot.gateways.ledger.status import ledger_status
+from beanbot.gateways.ledger.accounts import account_matches
+from beanbot.gateways.ledger.history import write_history
 
 router = APIRouter()
 
@@ -51,6 +53,12 @@ def status(request: Request, user: CurrentUser):
     return ledger_status(ledger_root(request.app.state.settings, user))
 
 
+@router.get('/ledger/history')
+def history(request: Request, user: CurrentUser):
+    ledger = user_ledger(request, user)
+    return write_history(ledger, request.app.state.settings.ledger_history_limit)
+
+
 def trend_months(today: date, count: int = TREND_MONTHS) -> list[date]:
     """最近 count 个自然月的月初，从早到晚。"""
     months: list[date] = []
@@ -68,7 +76,7 @@ async def accounts(
     return [
         {"account": account, "display_name": display_name}
         for account, display_name in user_ledger(request, user).accounts_with_names()
-        if account.startswith(prefix)
+        if account_matches(account, prefix)
     ]
 
 

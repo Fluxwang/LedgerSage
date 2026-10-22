@@ -7,19 +7,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from beanbot.exceptions import NotFound
+
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
 class Database:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, *, conversation_title_auto_length: int = 10):
         """
         schema_version 只有一列 version
         记录哪些迁移文件已经执行过，保证每个迁移只跑一次
         遍历 migrations/*.sql, 取出编号
         """
         self.path = path
+        self.conversation_title_auto_length = conversation_title_auto_length
         path.parent.mkdir(
             parents=True, exist_ok=True
         )  # parents 相当于 mkdir -p, exist_ok 文件已经存在也不报错
@@ -193,33 +196,82 @@ class Database:
     def resolve_pending(
         self, pending_id: str, status: str, commit: str | None = None
     ) -> None:
+        """把一条待确认写入标记为终态，并记下结案时间。只改 status / commit_sha / resolved_at，不动 payload
+        Args:
+            pending_id: 待确认写入的id.
+            status: 终态，'confirmed' / 'rejected' / 'expired' 之一
+            commit: 写入账本后的 git 提交 sha，只有 confirmed 时传入，其余为 None
+        """
         self.execute(
             "UPDATE pending_writes SET status=?,commit_sha=?,resolved_at=? WHERE id=? AND status=?",
             (status, commit, now(), pending_id, "pending"),
         )
 
-    def session(self, user_id: str, thread_id: str, message: str = '') -> dict:
+    def session(self, user_id: str, thread_id: str, message: str = "") -> dict:
+        """按 thread_id 取出当前用户的对话框，没有就新建一个。
+        Args:
+            user_id: 当前用户id
+            thread_id: 对话框id，由前端新建对话时生成
+            message: 只在新建时用，取前 20 个字作为标题，为空时为"新对话"
+        Returns:
+            sessions 表中的一行，其中：
+                active_run_id: 暂停中、等用户回答追问的 run；ChatService 收到 ask 时写入，run 结束后清空
+                pending_at: 追问开始的时间，用来判断是否超过 24 小时
+                last_active_at: 新建时为当前时间，之后每次 run 结束或暂停，由 ChatService 更新
+            示例：{"id": "s1", "thread_id": "t1", "title": "午饭 38，微信", "active_run_id": None, ...}
+        """
         rows = self.rows(
             "SELECT * FROM sessions WHERE user_id=? AND thread_id=?",
             (user_id, thread_id),
         )
         if rows:
+            if rows[0]["deleted_at"] is not None:
+                raise NotFound("对话不存在")
             return rows[0]
         session = {
             "id": uuid4().hex,
             "user_id": user_id,
             "thread_id": thread_id,
-            "title": message[:20] if message else "新对话",
+            "title": message[:self.conversation_title_auto_length] if message else "新对话",
             "created_at": now(),
             "last_active_at": now(),
             "active_run_id": None,
             "pending_at": None,
         }
         self.execute(
-            "INSERT INTO sessions VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT INTO sessions(id,user_id,thread_id,title,created_at,last_active_at,active_run_id,pending_at) "
+            "VALUES(?,?,?,?,?,?,?,?)",
             tuple(session.values()),
         )
         return session
+
+    def rename_session(self, user_id: str, thread_id: str, title: str) -> bool:
+        """只改当前用户仍存在的对话标题，不改变活跃顺序。"""
+        with self.connect() as db:
+            return db.execute(
+                "UPDATE sessions SET title=? WHERE user_id=? AND thread_id=? AND deleted_at IS NULL",
+                (title, user_id, thread_id),
+            ).rowcount == 1
+
+    def delete_session(self, user_id: str, thread_id: str) -> bool:
+        """软删除与丢弃待确认写入在同一事务中完成，保留其余审计数据。"""
+        timestamp = now()
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            changed = db.execute(
+                "UPDATE sessions SET deleted_at=? WHERE user_id=? AND thread_id=? AND deleted_at IS NULL",
+                (timestamp, user_id, thread_id),
+            ).rowcount
+            if not changed:
+                return False
+            db.execute(
+                "UPDATE pending_writes SET status='rejected',resolved_at=? "
+                "WHERE user_id=? AND status='pending' AND run_id IN ("
+                "SELECT r.id FROM runs r JOIN sessions s ON s.id=r.session_id "
+                "WHERE s.user_id=? AND s.thread_id=?)",
+                (timestamp, user_id, user_id, thread_id),
+            )
+            return True
 
     def create_run(self, session: dict, user_id: str, model: str, message: str) -> dict:
         timestamp = now()
@@ -268,9 +320,13 @@ class Database:
 
     def delete_saved_query(self, query_id: str, user_id: str) -> bool:
         with self.connect() as db:
-            return db.execute(
-                "DELETE FROM saved_queries WHERE id=? AND user_id=?", (query_id, user_id)
-            ).rowcount == 1
+            return (
+                db.execute(
+                    "DELETE FROM saved_queries WHERE id=? AND user_id=?",
+                    (query_id, user_id),
+                ).rowcount
+                == 1
+            )
 
     def finish_run(
         self, run_id: str, status: str, total_ms: int, intent: str | None = None

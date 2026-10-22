@@ -31,7 +31,10 @@ def create_app(
     settings = settings or Settings()  # type: ignore[call-arg]  # values come from environment
     app = FastAPI(title="LedgerSage")
     app.state.settings = settings
-    app.state.db = Database(settings.database_path)
+    app.state.db = Database(
+        settings.database_path,
+        conversation_title_auto_length=settings.conversation_title_auto_length,
+    )
     app.state.ledgers = LedgerFactory(settings)
     app.state.agent_model = agent_model or OpenAIAgentModel(settings)
     app.state.vectors = VectorIndexManager(settings, app.state.ledgers)

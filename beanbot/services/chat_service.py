@@ -24,14 +24,17 @@ class ChatService:
         self, user: dict, thread_id: str, message: str
     ) -> AsyncIterator[dict]:
         graph_input: Any
+
+        # 通过userid 和 thread_id 找到指定对话框, 每个对话框一个thread_id
         session = self.database.session(user["id"], thread_id, message)
         active_run_id = session.get("active_run_id")
         pending_at = session.get("pending_at")
-        resumed = False
+        run: dict | None = None
         if active_run_id and pending_at:
             age = datetime.now(timezone.utc) - datetime.fromisoformat(pending_at)
             if age <= timedelta(hours=24):
                 runs = self.database.rows(
+                    # 在建表时, 数据库保证每个 id 在表里唯一
                     "SELECT * FROM runs WHERE id=? AND user_id=?",
                     (active_run_id, user["id"]),
                 )
@@ -41,8 +44,6 @@ class ChatService:
                         "UPDATE runs SET status='running',updated_at=? WHERE id=?",
                         (now(), run["id"]),
                     )
-                    graph_input = Command(resume=message)
-                    resumed = True
             else:
                 self.database.finish_run(
                     active_run_id,
@@ -57,7 +58,7 @@ class ChatService:
                     "type": "message",
                     "content": "上一次追问已超过 24 小时，本条消息将作为新的运行处理。",
                 }
-        if not resumed:
+        if run is None:
             run = self.database.create_run(
                 session, user["id"], self.model_name, message
             )
@@ -68,6 +69,8 @@ class ChatService:
                 "run_id": run["id"],
                 "bounce_count": 0,
             }
+        else:
+            graph_input = Command(resume=message)
         started = perf_counter()
         graph_thread_id = f"{user['id']}:{run['id']}"
         try:

@@ -3,7 +3,8 @@ import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, Response
+from pydantic import BaseModel
 
 from beanbot.api.auth import CurrentUser
 from beanbot.exceptions import DomainError, NotFound
@@ -12,6 +13,28 @@ from beanbot.services.agent.accounts import preview_accounts
 from beanbot.services.pending_service import PENDING_TTL
 
 router = APIRouter(prefix='/sessions')
+
+
+class RenameSession(BaseModel):
+    title: str
+
+
+@router.patch('/{thread_id}')
+def rename_session(thread_id: str, body: RenameSession, request: Request, user: CurrentUser):
+    title = body.title.strip()
+    maximum = request.app.state.settings.conversation_title_max_length
+    if not 1 <= len(title) <= maximum:
+        raise HTTPException(status_code=422, detail=f'对话标题不能为空，且不能超过 {maximum} 个字')
+    if not request.app.state.db.rename_session(user['id'], thread_id, title):
+        raise NotFound('对话不存在')
+    return {'thread_id': thread_id, 'title': title}
+
+
+@router.delete('/{thread_id}', status_code=204)
+def delete_session(thread_id: str, request: Request, user: CurrentUser):
+    if not request.app.state.db.delete_session(user['id'], thread_id):
+        raise NotFound('对话不存在')
+    return Response(status_code=204)
 
 
 def ask_state(session: dict) -> dict:
@@ -23,18 +46,24 @@ def ask_state(session: dict) -> dict:
 
 @router.get('')
 async def list_sessions(request: Request, user: CurrentUser):
+    cutoff = (datetime.now(timezone.utc) - PENDING_TTL).isoformat()
     rows = request.app.state.db.rows(
-        'SELECT * FROM sessions WHERE user_id=? ORDER BY last_active_at DESC,id DESC LIMIT 30',
-        (user['id'],),
+        "SELECT s.*, (SELECT COUNT(*) FROM pending_writes p JOIN runs r ON r.id=p.run_id "
+        "WHERE r.session_id=s.id AND p.user_id=s.user_id AND p.status='pending' "
+        "AND julianday(p.created_at)>=julianday(?)) AS pending_write_count "
+        "FROM sessions s WHERE s.user_id=? AND s.deleted_at IS NULL "
+        "ORDER BY s.last_active_at DESC,s.id DESC LIMIT 30",
+        (cutoff, user['id']),
     )
     return [{key: row[key] for key in ('thread_id', 'title', 'last_active_at')} |
-            {'has_pending_ask': ask_state(row)['has_pending_ask']} for row in rows]
+            {'has_pending_ask': ask_state(row)['has_pending_ask'],
+             'pending_write_count': row['pending_write_count']} for row in rows]
 
 
 @router.get('/{thread_id}/runs')
 async def replay_session(thread_id: str, request: Request, user: CurrentUser):
     database = request.app.state.db
-    rows = database.rows('SELECT * FROM sessions WHERE user_id=? AND thread_id=?', (user['id'], thread_id))
+    rows = database.rows('SELECT * FROM sessions WHERE user_id=? AND thread_id=? AND deleted_at IS NULL', (user['id'], thread_id))
     if not rows:
         raise NotFound('对话不存在')
     session = rows[0]

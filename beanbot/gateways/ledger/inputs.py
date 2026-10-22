@@ -31,7 +31,7 @@ class TransactionInput(BaseModel):
     to_account: str = Field(min_length=1)
     tags: set[str] = Field(default_factory=set)
 
-    @model_validator(mode="after")
+    @model_validator(mode="after")  # 表示在所有字段都解析、校验完之后再运行
     def normalize_flow(self):
         if self.to_account.startswith("Income:"):
             self.from_account, self.to_account = self.to_account, self.from_account
