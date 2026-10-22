@@ -702,11 +702,32 @@ class Ledger:
 
 
 class LedgerFactory:
+    """按用户提供 Ledger 实例，并以 LRU 缓存复用已加载的账本。
+
+    加载 Ledger 需要解析整套 Beancount 文件，开销较大；缓存容量由
+    settings.ledger_cache_size 控制，超出时淘汰最久未使用的账本。
+    """
+
     def __init__(self, settings: Settings):
         self.settings = settings
         self._cache: OrderedDict[str, Ledger] = OrderedDict()
 
     def get(self, user: dict) -> Ledger:
+        """获取用户的账本，必要时初始化目录并加载。
+
+        Args:
+            user: 用户记录，至少包含 id；若带 ledger_path，
+            则接管该路径下已有的账本，否则使用
+            settings.ledger_root / <id>，不存在时自动创建。
+                示例：{"id": "u1", "ledger_path": "/srv/books/alice"}。
+
+        Returns:
+            该用户的 Ledger 实例；命中缓存时直接复用。
+
+        Raises:
+            LedgerWriteConflict: 接管路径缺少 main.bean，或账本
+            存在语法错误无法加载时抛出。
+        """
         user_id = str(user["id"])
         if user_id in self._cache:
             ledger = self._cache.pop(user_id)

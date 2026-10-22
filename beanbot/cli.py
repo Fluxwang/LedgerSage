@@ -19,6 +19,8 @@ def main():
     serve.add_argument("--port", default=8000, type=int)
     invite = commands.add_parser(name="invite", help="生成邀请码")
     invite.add_argument("--count", type=int, default=1)
+    dev = commands.add_parser(name="dev", help="同时启动前端dev server 和后端")
+    dev.add_argument("--port", type=int, default=8000)
     migrate = commands.add_parser(
         name="migrate-account-names",
         aliases=["migrate_account_names"],
@@ -48,6 +50,22 @@ def main():
             port=args.port,
             workers=1,
         )
+    elif args.command == "dev":
+        import uvicorn
+
+        web_dir = Path(__file__).resolve().parents[1] / "web"
+        frontend = subprocess.Popen(["pnpm", "run", "dev"], cwd=web_dir)
+        try:
+            uvicorn.run(
+                "beanbot.api.app:create_app",
+                factory=True,
+                host="127.0.0.1",
+                port=args.port,
+                workers=1,
+            )
+        finally:
+            frontend.terminate()
+            frontend.wait()
     elif args.command == "invite":
         settings = Settings()  # type: ignore[call-arg]
         database = Database(settings.database_path)
