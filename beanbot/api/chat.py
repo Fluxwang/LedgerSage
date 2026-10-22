@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from beanbot.api.auth import CurrentUser
+from beanbot.exceptions import NotFound
 
 router = APIRouter(prefix="/chat")
 
@@ -44,6 +45,13 @@ async def chat_stream(
     request: Request,
     user: CurrentUser,
 ):
+    # 必须在创建 SSE 响应之前拒绝，才能向调用方返回真正的 HTTP 404。
+    if request.app.state.db.rows(
+        'SELECT id FROM sessions WHERE user_id=? AND thread_id=? AND deleted_at IS NOT NULL',
+        (user['id'], body.thread_id),
+    ):
+        raise NotFound('对话不存在')
+
     async def events():
         try:
             async for event in request.app.state.chat.stream(

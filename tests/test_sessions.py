@@ -18,7 +18,7 @@ def test_list_replay_continue_and_isolation(tmp_path):
         converse(client, headers, 'history', first)
         converse(client, headers, 'history', '这个月花了多少')
         rows = client.get('/sessions', headers=headers).json()
-        assert rows[0]['title'] == first[:20]
+        assert rows[0]['title'] == first[:10]
         assert not rows[0]['has_pending_ask']
         replay = client.get('/sessions/history/runs', headers=headers).json()
         assert [run['message'] for run in replay['runs']] == [first, '这个月花了多少']

@@ -7,19 +7,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from beanbot.exceptions import NotFound
+
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
 class Database:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, *, conversation_title_auto_length: int = 10):
         """
         schema_version 只有一列 version
         记录哪些迁移文件已经执行过，保证每个迁移只跑一次
         遍历 migrations/*.sql, 取出编号
         """
         self.path = path
+        self.conversation_title_auto_length = conversation_title_auto_length
         path.parent.mkdir(
             parents=True, exist_ok=True
         )  # parents 相当于 mkdir -p, exist_ok 文件已经存在也不报错
@@ -210,22 +213,53 @@ class Database:
             (user_id, thread_id),
         )
         if rows:
+            if rows[0]["deleted_at"] is not None:
+                raise NotFound("对话不存在")
             return rows[0]
         session = {
             "id": uuid4().hex,
             "user_id": user_id,
             "thread_id": thread_id,
-            "title": message[:20] if message else "新对话",
+            "title": message[:self.conversation_title_auto_length] if message else "新对话",
             "created_at": now(),
             "last_active_at": now(),
             "active_run_id": None,
             "pending_at": None,
         }
         self.execute(
-            "INSERT INTO sessions VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT INTO sessions(id,user_id,thread_id,title,created_at,last_active_at,active_run_id,pending_at) "
+            "VALUES(?,?,?,?,?,?,?,?)",
             tuple(session.values()),
         )
         return session
+
+    def rename_session(self, user_id: str, thread_id: str, title: str) -> bool:
+        """只改当前用户仍存在的对话标题，不改变活跃顺序。"""
+        with self.connect() as db:
+            return db.execute(
+                "UPDATE sessions SET title=? WHERE user_id=? AND thread_id=? AND deleted_at IS NULL",
+                (title, user_id, thread_id),
+            ).rowcount == 1
+
+    def delete_session(self, user_id: str, thread_id: str) -> bool:
+        """软删除与丢弃待确认写入在同一事务中完成，保留其余审计数据。"""
+        timestamp = now()
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            changed = db.execute(
+                "UPDATE sessions SET deleted_at=? WHERE user_id=? AND thread_id=? AND deleted_at IS NULL",
+                (timestamp, user_id, thread_id),
+            ).rowcount
+            if not changed:
+                return False
+            db.execute(
+                "UPDATE pending_writes SET status='rejected',resolved_at=? "
+                "WHERE user_id=? AND status='pending' AND run_id IN ("
+                "SELECT r.id FROM runs r JOIN sessions s ON s.id=r.session_id "
+                "WHERE s.user_id=? AND s.thread_id=?)",
+                (timestamp, user_id, user_id, thread_id),
+            )
+            return True
 
     def create_run(self, session: dict, user_id: str, model: str, message: str) -> dict:
         timestamp = now()
