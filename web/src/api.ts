@@ -121,11 +121,16 @@ export type LedgerStatus = {
 /** 顶栏与右栏共用的账本健康度，独立于仪表盘和统计区间。 */
 export const ledgerStatus = () => api<LedgerStatus>("/ledger/status");
 
-export type LedgerSlice = { file: string; start_line: number; lines: string[] };
+export type LedgerHistoryEntry = {
+  commit: string;
+  kind: "record" | "budget" | "delete";
+  summary: string;
+  file: string;
+  committed_at: string;
+  undone_at: string | null;
+};
 
-/** 右栏「即将写入的 diff」上下文，以及「查询命中的原始条目」。 */
-export const ledgerSlice = (_params: { file?: string; around?: number; context?: number }): Promise<LedgerSlice> =>
-  pending("GET /ledger/raw", "右栏要展示写入位置前后的账本原文");
+export const ledgerHistory = () => api<LedgerHistoryEntry[]>("/ledger/history");
 
 export type Validation = { level: "ok" | "warn"; text: string };
 

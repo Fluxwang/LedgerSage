@@ -48,7 +48,7 @@ class BudgetQueryFixtureModel(FixtureModel):
     async def classify(self, message, history):
         return Classification(intent="query", confidence=0.95)
 
-    async def query(self, message, today):
+    async def query(self, message, accounts, today):
         return QueryPlan(tool="budget_status")
 
 

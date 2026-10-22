@@ -10,6 +10,7 @@ export type WriteReceipt = {
   entries: string[];
   text: string;
   added_lines: string[];
+  context_before?: string[];
   balanced: boolean;
   validations: Validation[];
   pending_id?: string;

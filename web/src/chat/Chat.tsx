@@ -160,7 +160,7 @@ export function Chat({
 
   const lastWrite = useMemo(() => {
     for (let index = turns.length - 1; index >= 0; index--) {
-      const write = [...turns[index].receipts].reverse().find((receipt) => receipt.kind === "write");
+      const write = [...turns[index].receipts].reverse().find((receipt) => (receipt.kind === "write" || receipt.kind === "budget"));
       if (write) return write as WriteReceipt;
     }
     return undefined;
