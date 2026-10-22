@@ -208,6 +208,18 @@ class Database:
         )
 
     def session(self, user_id: str, thread_id: str, message: str = "") -> dict:
+        """按 thread_id 取出当前用户的对话框，没有就新建一个。
+        Args:
+            user_id: 当前用户id
+            thread_id: 对话框id，由前端新建对话时生成
+            message: 只在新建时用，取前 20 个字作为标题，为空时为"新对话"
+        Returns:
+            sessions 表中的一行，其中：
+                active_run_id: 暂停中、等用户回答追问的 run；ChatService 收到 ask 时写入，run 结束后清空
+                pending_at: 追问开始的时间，用来判断是否超过 24 小时
+                last_active_at: 新建时为当前时间，之后每次 run 结束或暂停，由 ChatService 更新
+            示例：{"id": "s1", "thread_id": "t1", "title": "午饭 38，微信", "active_run_id": None, ...}
+        """
         rows = self.rows(
             "SELECT * FROM sessions WHERE user_id=? AND thread_id=?",
             (user_id, thread_id),
