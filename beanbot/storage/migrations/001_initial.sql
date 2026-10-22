@@ -14,6 +14,13 @@ CREATE TABLE runs(id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessi
  updated_at TEXT NOT NULL, title TEXT NOT NULL);
 CREATE TABLE run_steps(id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id),
  seq INTEGER NOT NULL, kicker TEXT NOT NULL CHECK(kicker IN ('PARSE','CLASSIFY','TOOL','ASK','REPLY')),
+-- 步骤类别
+--   CLASSIFY 识别意图（记账 / 查询 / 预算……）
+--   PARSE    从自然语言中抽取交易字段
+--   ASK      信息不足，向用户追问
+--   TOOL     操作账本（写入 / 查询 / 设置预算）
+--   REPLY    生成最终回复
+
  title TEXT NOT NULL, duration_ms INTEGER NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL,
  UNIQUE(run_id,seq));
 CREATE INDEX runs_user_created ON runs(user_id,created_at);
