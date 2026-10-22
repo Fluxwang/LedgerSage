@@ -193,12 +193,18 @@ class Database:
     def resolve_pending(
         self, pending_id: str, status: str, commit: str | None = None
     ) -> None:
+        """把一条待确认写入标记为终态，并记下结案时间。只改 status / commit_sha / resolved_at，不动 payload
+        Args:
+            pending_id: 待确认写入的id.
+            status: 终态，'confirmed' / 'rejected' / 'expired' 之一
+            commit: 写入账本后的 git 提交 sha，只有 confirmed 时传入，其余为 None
+        """
         self.execute(
             "UPDATE pending_writes SET status=?,commit_sha=?,resolved_at=? WHERE id=? AND status=?",
             (status, commit, now(), pending_id, "pending"),
         )
 
-    def session(self, user_id: str, thread_id: str, message: str = '') -> dict:
+    def session(self, user_id: str, thread_id: str, message: str = "") -> dict:
         rows = self.rows(
             "SELECT * FROM sessions WHERE user_id=? AND thread_id=?",
             (user_id, thread_id),
@@ -268,9 +274,13 @@ class Database:
 
     def delete_saved_query(self, query_id: str, user_id: str) -> bool:
         with self.connect() as db:
-            return db.execute(
-                "DELETE FROM saved_queries WHERE id=? AND user_id=?", (query_id, user_id)
-            ).rowcount == 1
+            return (
+                db.execute(
+                    "DELETE FROM saved_queries WHERE id=? AND user_id=?",
+                    (query_id, user_id),
+                ).rowcount
+                == 1
+            )
 
     def finish_run(
         self, run_id: str, status: str, total_ms: int, intent: str | None = None
