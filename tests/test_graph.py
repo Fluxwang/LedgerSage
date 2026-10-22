@@ -36,7 +36,7 @@ class FixtureModel:
             from_account=None, to_account='Expenses:Food:Dining',
         )])
 
-    async def query(self, message, today):
+    async def query(self, message, accounts, today):
         return QueryPlan(tool='list_accounts')
 
     async def budget(self, message, accounts):
@@ -47,7 +47,7 @@ class QueryFixtureModel(FixtureModel):
     async def classify(self, message, history):
         return Classification(intent='query', confidence=0.96)
 
-    async def query(self, message, today):
+    async def query(self, message, accounts, today):
         return QueryPlan(tool='query_transactions', arguments=TransactionQuery(
             start=date(2026, 9, 1), end=date(2026, 9, 9), account_prefix='Expenses:', limit=100,
         ))
@@ -298,7 +298,7 @@ async def test_query_branch_returns_verifiable_numbers_without_writing(tmp_path)
     events = [event async for event in service.stream(user, 'query-thread', '这个月餐饮花了多少')]
 
     messages = [event['content'] for event in events if event['type'] == 'message']
-    assert messages == ['共找到 1 笔（2026-09-01 至 2026-09-09），支出合计 128。']
+    assert messages == ['2026-09-01 至 2026-09-09，Expenses 共 1 笔，支出合计 128.00。']
     assert len(ledger.query_transactions(date(2026, 9, 1), date(2026, 9, 9), 'Expenses:')) == 1
     after = subprocess.check_output(['git', '-C', str(ledger.root), 'rev-parse', 'HEAD'], text=True).strip()
     assert after == before

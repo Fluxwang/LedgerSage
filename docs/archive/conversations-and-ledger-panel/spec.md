@@ -1,9 +1,9 @@
 # 对话列表菜单、右栏账本占位收尾、统计页去掉两个空 tab、查询账户前缀修复
 
-Status: ready-for-agent
+Status: done
 Branch: feat/conversations-and-ledger-panel
 
-术语以 [`CONTEXT.md`](../../CONTEXT.md) 为准。本期新增的术语有两个：**对话 (Conversation)** 和 **写入历史 (Write History)**。本期还在「账户」词条里补充了按段匹配的规则。本期不新增 ADR。实现拆成 9 张票，放在 [`issues/`](issues/) 下。
+术语以 [`CONTEXT.md`](../../../CONTEXT.md) 为准。本期新增的术语有两个：**对话 (Conversation)** 和 **写入历史 (Write History)**。本期还在「账户」词条里补充了按段匹配的规则。本期不新增 ADR。实现拆成 9 张票，放在 [`issues/`](issues/) 下。
 
 ## Problem Statement
 
@@ -203,3 +203,7 @@ ledger_history_limit: int = Field(default=10, ge=1, le=100)            # 写入�
 
 - 拆成 9 张票：01 对话重命名，02 对话删除（依赖 01 的「⋯」菜单），03 diff 卡上文，04 写入历史，05 统计页去掉两个空 tab，06 查询提示词带上账户表，07 账户前缀规范化与按段匹配，08 前缀不存在时如实回答（依赖 07），09 查询回复写明口径（依赖 07）。除 02、08、09 外都可以直接开始。
 - 全部完成后，把本目录 `git mv` 到 `docs/archive/conversations-and-ledger-panel/`。
+
+## 完成记录
+
+2026-10-22：ticket 03–09 已完成；ticket 01–02 沿用本分支已有实现。全量 pytest 165 项通过，mypy 与前端构建通过。已用临时账本和 FixtureModel 完成浏览器验证；真实 LLM 验证未执行。完成代码差异审查，未发现阻塞问题。

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from difflib import get_close_matches
 from time import perf_counter
 from typing import Any, AsyncIterator, TypedDict
 from uuid import uuid4
@@ -13,6 +14,7 @@ from langgraph.types import Command, interrupt
 from langchain_core.runnables import RunnableConfig
 
 from beanbot.config import Settings
+from beanbot.gateways.ledger.accounts import account_matches, normalize_prefix
 from beanbot.gateways.ledger import LedgerFactory, TransactionInput, flow_direction
 from beanbot.services.agent.classify import Classification, Intent, route_classification
 from beanbot.services.agent.confidence import account_confidence
@@ -172,18 +174,40 @@ class AgentGraph:
 
     async def query(self, state: AgentState) -> dict:
         ledger = self.ledgers.get(state['user'])
-        plan = await self.model.query(state['message'], date.today())
+        ledger.reload()
+        accounts = [(a, n) for a, n in ledger.accounts_with_names() if not a.startswith('Equity:')]
+        plan = await self.model.query(state['message'], accounts, date.today())
+        original = plan.model_dump(mode='json')
         result: Any
+        prefix = normalize_prefix(plan.arguments.account_prefix if plan.tool == 'query_transactions' and plan.arguments
+                                  else plan.account_prefix)
+        if plan.tool in ('query_transactions', 'get_balance', 'list_accounts') and prefix and not any(
+            account_matches(account, prefix) for account in ledger.accounts
+        ):
+            matches = [a for a, n in accounts if n and n in state['message']]
+            matches.extend(get_close_matches(prefix, [a for a, _ in accounts], n=3, cutoff=0.6))
+            matches = list(dict.fromkeys(matches))[:3]
+            names = dict(accounts)
+            suggestions = [{'account': a, 'display_name': names[a] or a} for a in matches]
+            if matches:
+                labels = '、'.join(f'{names[a]}（{a}）' if names[a] else a for a in matches)
+                reply = f'账本里没有 `{prefix}` 这个账户。你是不是想查：{labels}？'
+            else:
+                reply = f'账本里没有 `{prefix}` 这个账户，可以问我『我有哪些账户』。'
+            result = {'error': 'account_not_found', 'account_prefix': prefix, 'candidates': suggestions}
+            return {'query_result': result, 'reply': reply,
+                    'receipt': {'tool': plan.tool, 'arguments': original, 'result': result}}
+
         if plan.tool == 'list_accounts':
             result = [{'account': account, 'display_name': name} for account, name in ledger.accounts_with_names()
-                      if not plan.account_prefix or account.startswith(plan.account_prefix)]
+                      if account_matches(account, prefix)]
         elif plan.tool == 'get_balance':
-            result = ledger.balances(plan.account_prefix or '', plan.as_of or date.today())
+            result = ledger.balances(prefix, plan.as_of or date.today())
         elif plan.tool == 'budget_status':
             result = ledger.budget_status()
         elif plan.arguments:
             result = ledger.query_transactions(
-                plan.arguments.start, plan.arguments.end, plan.arguments.account_prefix,
+                plan.arguments.start, plan.arguments.end, prefix,
                 plan.arguments.payee, plan.arguments.limit,
                 Decimal(str(plan.arguments.min_amount)) if plan.arguments.min_amount is not None else None,
                 Decimal(str(plan.arguments.max_amount)) if plan.arguments.max_amount is not None else None,
@@ -192,8 +216,8 @@ class AgentGraph:
         else:
             result = {'error': '查询参数不足'}
         return {
-            'query_result': result, 'reply': self._query_reply(result, plan),
-            'receipt': {'tool': plan.tool, 'arguments': plan.model_dump(mode='json'), 'result': result},
+            'query_result': result, 'reply': self._query_reply(result, plan, dict(accounts)),
+            'receipt': {'tool': plan.tool, 'arguments': original, 'result': result},
         }
 
     @staticmethod
@@ -206,23 +230,27 @@ class AgentGraph:
         ) + '。'
 
     @staticmethod
-    def _query_reply(result: Any, plan: Any = None) -> str:
+    def _query_reply(result: Any, plan: Any = None, names: dict | None = None) -> str:
         if plan is not None and getattr(plan, 'tool', None) == 'budget_status':
             return AgentGraph._budget_reply(result)
-        if isinstance(result, list):
-            if not result:
-                return '这个范围内没有找到记录。'
-            total = Decimal()
-            for transaction in result:
-                for posting in transaction.get('postings', []):
-                    if posting.get('amount') and posting.get('account', '').startswith('Expenses:'):
-                        total += abs(Decimal(posting['amount']))
-            interval = ''
-            if plan and plan.arguments:
-                interval = f"（{plan.arguments.start.isoformat()} 至 {plan.arguments.end.isoformat()}）"
-            return f'共找到 {len(result)} 笔{interval}，支出合计 {total}。'
         if isinstance(result, dict) and result.get('error'):
             return result['error']
+        if plan and plan.tool == 'list_accounts':
+            return f'共 {len(result)} 个账户。'
+        if isinstance(result, list) and plan and plan.arguments:
+            args = plan.arguments
+            prefix = normalize_prefix(args.account_prefix)
+            name = (names or {}).get(prefix)
+            label = f'{name}（{prefix}）' if name else (f'{prefix} ' if prefix else '')
+            scope = f'{args.start.isoformat()} 至 {args.end.isoformat()}，{label}'
+            if not result:
+                return scope + '没有记录。'
+            if args.group_by != 'none':
+                total = sum((Decimal(row['amount']) for row in result), Decimal())
+                return f'{scope}共 {len(result)} 组，金额合计 {total:.2f}。'
+            total = sum((Decimal(posting['amount']) for row in result for posting in row.get('postings', [])
+                         if posting.get('amount') and account_matches(posting.get('account', ''), 'Expenses')), Decimal())
+            return f'{scope}共 {len(result)} 笔，支出合计 {total:.2f}。'
         return f'查询结果：{result}'
 
     async def budget(self, state: AgentState) -> dict:

@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { accounts as fetchAccounts, type Dashboard } from "../api";
-import { abs, Async, Bar, budgetState, BUDGET_LABEL, Meter, monthLabel, num, Stub, useAsync } from "../ui";
+import { accounts as fetchAccounts, ledgerHistory, type Dashboard } from "../api";
+import { abs, Async, Bar, budgetState, BUDGET_LABEL, Meter, monthLabel, num, useAsync } from "../ui";
 import type { WriteReceipt } from "./Results";
 import type { LedgerHealthState } from "../shell/LedgerHealth";
 
 type Tab = "ledger" | "accounts" | "charts";
 
 function Diff({ receipt, health }: { receipt: WriteReceipt; health: LedgerHealthState }) {
+  const context = receipt.context_before ?? [];
   const lines = receipt.added_lines ?? receipt.text.split("\n");
   return (
     <div className="pcard">
@@ -17,6 +18,13 @@ function Diff({ receipt, health }: { receipt: WriteReceipt; health: LedgerHealth
         <small>L{receipt.insert_at_line}</small>
       </header>
       <pre className="diff">
+        {context.map((line, index) => (
+          <span className="context" key={`context-${index}`}>
+            <span className="ln">{receipt.insert_at_line - context.length + index}</span>
+            <span className="sign">{"  "}</span>
+            {line}
+          </span>
+        ))}
         {lines.map((line, index) => (
           <span className="add" key={index}>
             <span className="ln">{receipt.insert_at_line + index}</span>
@@ -88,6 +96,37 @@ function Budgets({ rows }: { rows: Dashboard["budgets"] }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function relativeTime(value: string) {
+  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60_000));
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)} 小时前`;
+  return `${Math.floor(minutes / 1440)} 天前`;
+}
+
+function WriteHistory({ health }: { health: LedgerHealthState }) {
+  // 健康度每次刷新都会产生新 data；确认、删除、撤销都复用这条刷新链路。
+  const state = useAsync(ledgerHistory, [health.data]);
+  const labels = { record: "记账", budget: "预算", delete: "删除" };
+  return (
+    <div className="pcard">
+      <header><b>写入历史</b></header>
+      <div className="in">
+        <Async state={state}>
+          {(rows) => rows.length ? rows.map((row) => (
+            <div className={`write-history-row${row.undone_at ? " undone" : ""}`} key={row.commit}>
+              <div className="kicker">{labels[row.kind]} · {relativeTime(row.committed_at)}</div>
+              <div>{row.summary}</div>
+              <small className="muted" title={row.commit}>{row.file}</small>
+              {row.undone_at && <small title={row.undone_at}>已撤销 · {relativeTime(row.undone_at)}</small>}
+            </div>
+          )) : <div className="hollow">还没有 LedgerSage 写入</div>}
+        </Async>
       </div>
     </div>
   );
@@ -204,11 +243,10 @@ export function LedgerPanel({
             {receipt ? (
               <Diff receipt={receipt} health={health} />
             ) : (
-              <div className="hollow">这一栏常驻账本原文。记一笔之后，这里会先显示将要写进去的那几行。</div>
+              <div className="hollow">记一笔之后，这里会显示即将写入的内容和插入位置上文。</div>
             )}
             {data && <Budgets rows={data.budgets} />}
-            <Stub endpoint="GET /ledger/raw" why="写入位置上下文与「查询命中的原始条目」需要按行读取账本原文。" />
-            <Stub endpoint="GET /ledger/history" why="右栏「写入历史」要列出最近几次提交与是否已回滚。" />
+            <WriteHistory health={health} />
           </>
         )}
         {tab === "accounts" && <Accounts />}

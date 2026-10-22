@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     ledger_cache_size: int = Field(default=64, ge=1)
     conversation_title_max_length: int = Field(default=40, ge=1, le=200)
     conversation_title_auto_length: int = Field(default=10, ge=1, le=200)
+    ledger_context_lines: int = Field(default=5, ge=0, le=50)
+    ledger_history_limit: int = Field(default=10, ge=1, le=100)
 
     @property
     def database_path(self) -> Path:

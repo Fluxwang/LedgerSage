@@ -64,15 +64,6 @@ export function Explore({
             {label}
           </button>
         ))}
-        <div className="off" title="多币种与投资持仓不在当前范围">
-          持仓
-        </div>
-        <div
-          className="off"
-          title="ADR 0006：不让 LLM 生成 BQL，也没有暴露 BQL 端点"
-        >
-          BQL 查询
-        </div>
         <div className="grow" />
         <button className="btn sm" onClick={() => onAsk("帮我看看这张表")}>
           在对话里追问这张表

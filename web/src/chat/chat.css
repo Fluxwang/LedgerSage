@@ -661,3 +661,22 @@
   font: 11px var(--mono);
   color: var(--ink-1);
 }
+
+.diff .context {
+  color: var(--ink-3);
+  display: block;
+}
+.write-history-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.write-history-row + .write-history-row {
+  border-top: 1px solid var(--line);
+}
+.write-history-row.undone {
+  color: var(--ink-3);
+}
