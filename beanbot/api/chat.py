@@ -22,11 +22,16 @@ class PendingEdit(BaseModel):
     to_account: str | None = Field(default=None, min_length=1)
 
 
-@router.patch('/pending/{pending_id}')
-async def edit_pending(pending_id: str, body: PendingEdit, request: Request,
-                       user: CurrentUser):
-    return request.app.state.pending.edit(user, pending_id, body.transaction_index,
-                                         body.model_dump(exclude={'transaction_index'}, exclude_none=True))
+@router.patch("/pending/{pending_id}")
+async def edit_pending(
+    pending_id: str, body: PendingEdit, request: Request, user: CurrentUser
+):
+    return request.app.state.pending.edit(
+        user,
+        pending_id,
+        body.transaction_index,
+        body.model_dump(exclude={"transaction_index"}, exclude_none=True),
+    )
 
 
 def sse(event: dict) -> str:

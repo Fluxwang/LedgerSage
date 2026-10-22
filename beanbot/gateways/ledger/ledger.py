@@ -24,7 +24,9 @@ from beanbot.exceptions import AccountNotFound, LedgerWriteConflict, NotFound
 from beanbot.gateways.ledger.ids import decode_transaction_id, encode_transaction_id
 from beanbot.gateways.ledger.inputs import TransactionInput
 from beanbot.gateways.ledger.periods import BUDGET_PERIODS, period_bounds, today as _today
-from beanbot.gateways.ledger.repo import commit_only, git, init_repo, scaffold_ledger
+from beanbot.gateways.ledger.repo import (
+    commit_only, git, init_repo, ledger_root, scaffold_ledger,
+)
 
 
 class Ledger:
@@ -267,6 +269,13 @@ class Ledger:
         return self._fold_postings(
             start, end, lambda _, posting: posting.account, "Expenses:"
         )
+
+    def payee_expenses(self, start: date, end: date) -> dict[str, Decimal]:
+        """按收款方原文汇总净支出，复用分类合计的分录行口径。"""
+        totals = self._fold_postings(
+            start, end, lambda transaction, _: transaction.payee or "", "Expenses:"
+        )
+        return {payee: amount for payee, amount in totals.items() if payee}
 
     def monthly_expenses(self, start: date, end: date) -> dict[str, Decimal]:
         """区间内按 YYYY-MM 汇总的净支出，用于趋势图。"""
@@ -693,17 +702,38 @@ class Ledger:
 
 
 class LedgerFactory:
+    """按用户提供 Ledger 实例，并以 LRU 缓存复用已加载的账本。
+
+    加载 Ledger 需要解析整套 Beancount 文件，开销较大；缓存容量由
+    settings.ledger_cache_size 控制，超出时淘汰最久未使用的账本。
+    """
+
     def __init__(self, settings: Settings):
         self.settings = settings
         self._cache: OrderedDict[str, Ledger] = OrderedDict()
 
     def get(self, user: dict) -> Ledger:
+        """获取用户的账本，必要时初始化目录并加载。
+
+        Args:
+            user: 用户记录，至少包含 id；若带 ledger_path，
+            则接管该路径下已有的账本，否则使用
+            settings.ledger_root / <id>，不存在时自动创建。
+                示例：{"id": "u1", "ledger_path": "/srv/books/alice"}。
+
+        Returns:
+            该用户的 Ledger 实例；命中缓存时直接复用。
+
+        Raises:
+            LedgerWriteConflict: 接管路径缺少 main.bean，或账本
+            存在语法错误无法加载时抛出。
+        """
         user_id = str(user["id"])
         if user_id in self._cache:
             ledger = self._cache.pop(user_id)
             self._cache[user_id] = ledger
             return ledger
-        root = Path(user.get("ledger_path") or self.settings.ledger_root / user_id)
+        root = ledger_root(self.settings, user)
         if user.get("ledger_path"):
             if not (root / "main.bean").is_file():
                 raise LedgerWriteConflict("接管路径缺少 main.bean")

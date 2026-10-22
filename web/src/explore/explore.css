@@ -428,6 +428,20 @@
   font: 11.5px var(--mono);
   flex: none;
 }
+.health-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.health-row > :first-child {
+  flex: none;
+}
+#ledger-health:focus {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
 
 .toast {
   position: fixed;

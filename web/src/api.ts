@@ -3,7 +3,7 @@
  *
  * 设计稿要求的数据里有一部分后端还没有对应端点：这些函数一律走 `pending()`，
  * 抛出 `MissingEndpoint`，由界面渲染成「待接口」占位而不是假数据。
- * 完整清单见 .scratch/ledgersage-frontend/missing-endpoints.md。
+ * 完整清单见 docs/archive/ledgersage-frontend/missing-endpoints.md。
  */
 
 const TOKEN_KEY = "beanchat_token";
@@ -75,6 +75,7 @@ export type Dashboard = {
   accounts: Card[];
   monthly_trend: { month: string; amount: string }[];
   categories: { account: string; display_name: string; amount: string }[];
+  top_payees: { payee: string; amount: string }[];
   recent: { rows: Row[]; page: number; size: number; total: number };
   budgets: Budget[];
   period: { start: string; end: string; name: string };
@@ -111,17 +112,13 @@ export const vector = {
 /* ---------------------------------------------------------------- 待补端点 */
 
 export type LedgerStatus = {
-  file: string;
-  currency: string;
-  transaction_count: number;
-  bean_check: { ok: boolean; message: string };
-  git: { clean: boolean; synced_at: string | null };
-  health: { level: "ok" | "warn"; text: string }[];
+  bean_check: { ok: boolean; error_count: number; message: string };
+  git: { clean: boolean; last_commit_at: string | null };
+  health: { key: "bean_check" | "working_tree" | "missing_payee"; level: "ok" | "warn"; text: string }[];
 };
 
-/** 顶栏的账本路径 / bean-check / git 状态，以及右栏「账本健康度」。 */
-export const ledgerStatus = (): Promise<LedgerStatus> =>
-  pending("GET /ledger/status", "顶栏与右栏需要账本文件名、笔数、bean-check 与 git 同步状态");
+/** 顶栏与右栏共用的账本健康度，独立于仪表盘和统计区间。 */
+export const ledgerStatus = () => api<LedgerStatus>("/ledger/status");
 
 export type LedgerSlice = { file: string; start_line: number; lines: string[] };
 
@@ -146,14 +143,15 @@ export const editWrite = (id: string, transactionIndex: number, field: "from_acc
     method: "PATCH", body: JSON.stringify({ transaction_index: transactionIndex, [field]: account }),
   });
 
-export type Session = { thread_id: string; title: string; updated_at: string };
+export type Session = { thread_id: string; title: string; last_active_at: string; has_pending_ask: boolean };
 
-/** 左侧「对话」列表。目前 thread_id 每次刷新都是新的随机 UUID。 */
+/** 最近 30 个对话，选择后沿用原来的 thread_id。 */
 export const sessions = (): Promise<Session[]> =>
-  pending("GET /sessions", "左栏对话列表需要可枚举、可恢复的会话");
+  api("/sessions");
 
-export const sessionMessages = (_threadId: string): Promise<any[]> =>
-  pending("GET /sessions/{thread_id}/messages", "切换会话要能回放历史消息与工具轨迹");
+export type SessionReplay = { active_run_id: string | null; pending_at: string | null; has_pending_ask: boolean; ask_expired: boolean; runs: any[] };
+export const sessionRuns = (threadId: string): Promise<SessionReplay> =>
+  api(`/sessions/${encodeURIComponent(threadId)}/runs`);
 
 export type AccountNode = {
   account: string;
@@ -237,15 +235,13 @@ export const deleteTransaction = (id: string) =>
     { method: "DELETE" },
   );
 
-export const topPayees = (_params: { start: string; end: string; limit: number }): Promise<{ payee: string; amount: string }[]> =>
-  pending("GET /analytics/top-payees", "右栏「前十收款方」没有对应聚合");
-
-export type SavedQuery = { id: string; title: string; params: Record<string, unknown> };
+export type SavedQuery = { id: string; question: string; created_at: string };
 
 export const savedQueries = {
-  list: (): Promise<SavedQuery[]> => pending("GET /saved-queries", "「常用查询」需要持久化"),
-  create: (_body: Omit<SavedQuery, "id">): Promise<SavedQuery> =>
-    pending("POST /saved-queries", "对话里跑过的查询要能存为常用"),
+  list: () => api<SavedQuery[]>("/saved-queries"),
+  create: (body: { run_id: string }) =>
+    api<SavedQuery>("/saved-queries", { method: "POST", body: JSON.stringify(body) }),
+  remove: (id: string) => api<{ status: string }>(`/saved-queries/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 
 export type MonthlyReport = {
