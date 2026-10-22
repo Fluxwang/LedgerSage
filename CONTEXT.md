@@ -15,7 +15,7 @@ _Avoid_: 账套、数据库、bean 文件
 _Avoid_: 账户（account 在本项目专指 Beancount 科目）、租户、客户
 
 **账户 (Account)**:
-Beancount 意义上的科目，形如 `Assets:WeChat:Balance`。永远不用来指代登录身份。
+Beancount 意义上的科目，形如 `Assets:WeChat:Balance`。永远不用来指代登录身份。按账户前缀筛选时**按段**算：`Expenses:Food` 包含 `Expenses:Food` 本身和 `Expenses:Food:Dining`，但不包含 `Expenses:FoodDelivery`；末尾的冒号不影响含义。
 _Avoid_: 科目、类目
 
 **分录行 (Posting)**:
