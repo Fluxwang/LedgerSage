@@ -49,3 +49,15 @@
   align-items: center;
   gap: 9px;
 }
+.modal-compact {
+  width: 420px;
+}
+.modal-compact p {
+  overflow-wrap: anywhere;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 6px;
+}

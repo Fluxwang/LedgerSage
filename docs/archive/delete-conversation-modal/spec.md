@@ -1,6 +1,6 @@
 # 删除对话改用 modal 确认弹窗
 
-Status: ready-for-agent
+Status: done
 
 术语以 [`CONTEXT.md`](../../CONTEXT.md) 为准。本期不新增术语，也不新增 ADR。注意区分两种删除：「删除对话」只是让对话从用户眼前消失，永远不碰账本；「删除 (Delete)」是从账本原文里移除整笔交易。
 
