@@ -65,6 +65,8 @@ beanbot/test/*
 docs/*
 !docs/adr/
 !docs/agents/
+!docs/archive/
+!docs/database-schema.md
 
 ./Beancount/
 
