@@ -223,11 +223,9 @@ pre {
   align-items: center;
   gap: 8px;
 }
-.topbar .brand i {
-  width: 17px;
-  height: 17px;
-  border-radius: 5px;
-  background: var(--green);
+.topbar .brand img {
+  width: 16px;
+  height: 16px;
 }
 .topbar .brand b {
   font-size: 13.5px;
