@@ -1,6 +1,6 @@
 # 写入历史卡片限高并在内部滚动
 
-Status: ready-for-agent
+Status: done
 
 术语以 [`CONTEXT.md`](../../CONTEXT.md) 为准。本期不新增术语，也不新增 ADR。**写入历史 (Write History)** 指 LedgerSage 替用户做过的写入（记账、设预算、删除），按时间倒序排列。
 

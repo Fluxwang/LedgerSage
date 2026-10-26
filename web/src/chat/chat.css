@@ -541,6 +541,12 @@
 }
 
 /* ---------- 右栏 ---------- */
+.chat > .panel {
+  min-height: 0;
+}
+.chat > .panel > .scroll > .pcard {
+  flex-shrink: 0;
+}
 .panel {
   border-left: 1px solid rgba(35, 30, 24, 0.1);
   background: var(--surface-2);
@@ -665,6 +671,11 @@
 .diff .context {
   color: var(--ink-3);
   display: block;
+}
+.write-history-list {
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .write-history-row {
   display: flex;
