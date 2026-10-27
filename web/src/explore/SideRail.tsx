@@ -43,7 +43,7 @@ export function SideRail({
           <header>
             <b>前十收款方</b>
           </header>
-          <div className="in">
+          <div className="in panel-list payee-list" role="region" aria-label="前十收款方列表" tabIndex={0}>
             <div className="pin">
               {data?.top_payees.map((row) => (
                 <div key={row.payee}>
@@ -61,7 +61,7 @@ export function SideRail({
           <header>
             <b>预算进度 · 本月</b>
           </header>
-          <div className="in">
+          <div className="in panel-list" role="region" aria-label="预算进度列表" tabIndex={0}>
             {data?.budgets.map((row) => {
               const used = Number(row.used);
               const limit = Number(row.amount);
@@ -102,7 +102,7 @@ export function SideRail({
           <header>
             <b>常用查询</b>
           </header>
-          <div className="in">
+          <div className="in panel-list" role="region" aria-label="常用查询列表" tabIndex={0}>
             <Async state={saved}>
               {(rows) => (
                 <>

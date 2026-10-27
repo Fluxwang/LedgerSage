@@ -405,6 +405,23 @@
   flex-direction: column;
   gap: 7px;
 }
+/* 卡片保持自然高度，长列表在正文内滚动，标题始终可见。 */
+.pcard > .panel-list {
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.pcard > .payee-list {
+  max-height: 180px;
+}
+.panel-list > * {
+  flex-shrink: 0;
+}
+.panel-list:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
 .pin > div {
   display: flex;
   justify-content: space-between;
