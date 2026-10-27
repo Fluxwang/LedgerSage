@@ -1,7 +1,7 @@
-export function Bar({ label, value, share, peak }: { label: string; value: string; share: number; peak?: boolean }) {
+export function Bar({ label, value, share, peak, title, wide }: { label: string; value: string; share: number; peak?: boolean; title?: string; wide?: boolean }) {
   return (
-    <div className={`barrow${peak ? " peak" : ""}`}>
-      <div className="lbl">{label}</div>
+    <div className={`barrow${peak ? " peak" : ""}${wide ? " wide" : ""}`}>
+      <div className="lbl" title={title ?? label}>{label}</div>
       <div className="track">
         <i style={{ width: `${Math.max(0, Math.min(100, share))}%` }} />
       </div>

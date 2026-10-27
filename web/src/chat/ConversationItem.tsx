@@ -35,16 +35,27 @@ export function ConversationItem({ item, active, running, onOpen, onRenamed, onD
     const outside = (event: MouseEvent) => {
       if (!row.current?.contains(event.target as Node)) setOpen(false);
     };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); }
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); return; }
+      if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+      const key = event.key.toUpperCase();
+      if (key === "R") { event.preventDefault(); startRename(); }
+      if (key === "D") { event.preventDefault(); void remove(); }
     };
     document.addEventListener("mousedown", outside);
-    document.addEventListener("keydown", escape);
+    document.addEventListener("keydown", keydown);
     return () => {
       document.removeEventListener("mousedown", outside);
-      document.removeEventListener("keydown", escape);
+      document.removeEventListener("keydown", keydown);
     };
   }, [open]);
+
+  function startRename() {
+    setDraft(item.title);
+    setEditing(true);
+    setOpen(false);
+    setError("");
+  }
 
   async function save() {
     setEditing(false);
@@ -102,8 +113,12 @@ export function ConversationItem({ item, active, running, onOpen, onRenamed, onD
       </div>
       {open && (
         <div className="menu conversation-menu" role="menu" aria-label="对话操作">
-          <button role="menuitem" onClick={() => { setDraft(item.title); setEditing(true); setOpen(false); setError(""); }}>重命名</button>
-          <button role="menuitem" className="conversation-delete" onClick={() => void remove()}>删除</button>
+          <button role="menuitem" aria-keyshortcuts="R" onClick={startRename}>
+            重命名<kbd className="menu-key">R</kbd>
+          </button>
+          <button role="menuitem" aria-keyshortcuts="D" className="conversation-delete" onClick={() => void remove()}>
+            删除<kbd className="menu-key">D</kbd>
+          </button>
         </div>
       )}
       {error && <div className="failed conversation-error" role="alert">{error}</div>}

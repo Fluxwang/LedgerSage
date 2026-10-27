@@ -211,7 +211,7 @@ class AgentGraph:
                 plan.arguments.payee, plan.arguments.limit,
                 Decimal(str(plan.arguments.min_amount)) if plan.arguments.min_amount is not None else None,
                 Decimal(str(plan.arguments.max_amount)) if plan.arguments.max_amount is not None else None,
-                plan.arguments.group_by,
+                plan.arguments.group_by, plan.arguments.order_by,
             )
         else:
             result = {'error': '查询参数不足'}
@@ -248,6 +248,10 @@ class AgentGraph:
             if args.group_by != 'none':
                 total = sum((Decimal(row['amount']) for row in result), Decimal())
                 return f'{scope}共 {len(result)} 组，金额合计 {total:.2f}。'
+            if args.order_by == 'amount_desc':
+                top = result[0]
+                head = '金额最大的一笔是' if len(result) == 1 else f'金额最大的 {len(result)} 笔里，第一笔是'
+                return f"{scope}{head} {top['date']} {top['payee'] or ''} · {top['narration']}，{top['amount']}。"
             total = sum((Decimal(posting['amount']) for row in result for posting in row.get('postings', [])
                          if posting.get('amount') and account_matches(posting.get('account', ''), 'Expenses')), Decimal())
             return f'{scope}共 {len(result)} 笔，支出合计 {total:.2f}。'

@@ -83,3 +83,34 @@ def test_transaction_rejects_an_empty_account():
     with pytest.raises(ValueError):
         TransactionInput(amount=Decimal('100'), date=date(2026, 9, 1), payee='测试',
                          from_account='', to_account='Assets:Cash')
+
+
+async def test_grouping_by_account_carries_display_names(tmp_path):
+    """按账户分组的结果要带上中文显示名，前端才能显示“餐饮”而不是被截断的账户全名。"""
+    ledger = LedgerFactory(settings(tmp_path)).get({'id': 'one', 'ledger_path': None})
+    await ledger.insert([transaction(), transaction(to_account='Expenses:Transport')], today=date(2026, 8, 1))
+    rows = ledger.query_transactions(date(2026, 8, 1), date(2026, 8, 1), 'Expenses', group_by='account')
+    assert {(row['group'], row['display_name']) for row in rows} == {
+        ('Expenses:Food:Dining', '餐饮'), ('Expenses:Transport', '交通'),
+    }
+
+
+async def test_ordering_by_amount_sorts_before_truncating(tmp_path):
+    """最大一笔可能在很早之前，必须先排序再截取，不能只在最近几笔里挑。"""
+    ledger = LedgerFactory(settings(tmp_path)).get({'id': 'one', 'ledger_path': None})
+    amounts = [Decimal('500'), Decimal('20'), Decimal('30')]
+    await ledger.insert([
+        TransactionInput(amount=amount, date=date(2026, 8, day), payee=f'店{day}', narration='消费',
+                         from_account='Assets:WeChat:Balance', to_account='Expenses:Food:Dining')
+        for day, amount in zip((1, 2, 3), amounts)
+    ], today=date(2026, 8, 3))
+    rows = ledger.query_transactions(date(2026, 8, 1), date(2026, 8, 3), 'Expenses', limit=2, order_by='amount_desc')
+    assert [row['amount'] for row in rows] == ['500', '30']
+
+
+async def test_grouping_sums_every_match_regardless_of_limit(tmp_path):
+    """分组是在算合计，limit 只限制明细笔数，不能让合计只加最近几笔。"""
+    ledger = LedgerFactory(settings(tmp_path)).get({'id': 'one', 'ledger_path': None})
+    await ledger.insert([transaction(), transaction(), transaction()], today=date(2026, 8, 1))
+    rows = ledger.query_transactions(date(2026, 8, 1), date(2026, 8, 1), 'Expenses', limit=1, group_by='account')
+    assert [row['amount'] for row in rows] == ['384']

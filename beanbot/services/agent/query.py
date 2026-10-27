@@ -55,17 +55,21 @@ def normalize_period(value: str | DateRange, today: date | None = None) -> DateR
 
 
 class TransactionQuery(BaseModel):
-    start: date
-    end: date
+    # 用户没说时间范围时留空，默认查本月
+    start: date | None = None
+    end: date | None = None
     account_prefix: str | None = None
     payee: str | None = None
     min_amount: float | None = None
     max_amount: float | None = None
     group_by: Literal["none", "day", "month", "account", "payee"] = "none"
+    order_by: Literal["date", "amount_desc"] = "date"
     limit: int = Field(default=100, ge=1, le=1000)
 
     @model_validator(mode="after")
     def validate_dates(self):
+        self.end = self.end or date.today()
+        self.start = self.start or self.end.replace(day=1)
         DateRange(start=self.start, end=self.end)
         return self
 

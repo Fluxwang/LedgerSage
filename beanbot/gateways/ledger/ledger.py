@@ -112,6 +112,7 @@ class Ledger:
         min_amount: Decimal | None = None,
         max_amount: Decimal | None = None,
         group_by: str = "none",
+        order_by: str = "date",
     ) -> list[dict]:
         account_prefix = normalize_prefix(account_prefix)
         result: list[dict[str, Any]] = []
@@ -160,8 +161,12 @@ class Ledger:
                     ],
                 }
             )
-            if len(result) >= limit:
+            # 分组要算全部匹配的合计，只有按日期列明细时才能提前截断
+            if order_by == "date" and group_by == "none" and len(result) >= limit:
                 break
+        if order_by == "amount_desc" and group_by == "none":
+            # 先全量排序再截取，否则只是在最近 limit 笔里挑最大
+            result = sorted(result, key=lambda row: Decimal(row["amount"]), reverse=True)[:limit]
         if group_by != "none":
             grouped: dict[str, Decimal] = {}
             for row in result:
@@ -181,8 +186,14 @@ class Ledger:
                 grouped[key] = grouped.get(key, Decimal()) + max(
                     values, default=Decimal()
                 )
+            if group_by != "account":
+                return [
+                    {"group": key, "amount": str(amount)}
+                    for key, amount in sorted(grouped.items())
+                ]
+            names = dict(self.accounts_with_names())
             return [
-                {"group": key, "amount": str(amount)}
+                {"group": key, "display_name": names.get(key) or key, "amount": str(amount)}
                 for key, amount in sorted(grouped.items())
             ]
         return result

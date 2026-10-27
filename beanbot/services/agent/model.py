@@ -86,6 +86,9 @@ class OpenAIAgentModel:
                 "选择固定工具 query_transactions/get_balance/list_accounts/budget_status 并填写参数。"
                 "问预算还剩多少、超没超时用 budget_status。"
                 "account_prefix 必须是账户表里的真实账户，或其按冒号分段的前缀，不得编造账户。"
+                "问题没提时间范围时 start/end 留空，默认查本月。"
+                "只有问最大、最贵的几笔时才用 order_by=amount_desc，limit 为要的笔数，没说就是 1；"
+                "问花了多少、合计、分类占比时不要改 limit；问开支时 account_prefix 填 Expenses。"
                 f"账户（账户名，显示名）：{accounts}。"
                 f"今天是 {today.isoformat()}。不得生成 BQL。问题：{message}"
             )

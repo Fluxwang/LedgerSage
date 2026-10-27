@@ -320,3 +320,11 @@ def test_run_title_names_the_direction(tmp_path, from_account, to_account, expec
         {'payee': '火锅店', 'from_account': from_account, 'to_account': to_account},
     ]}
     assert graph.run_title(state) == expected
+
+
+def test_reply_names_the_largest_transaction_when_ordered_by_amount():
+    plan = QueryPlan(tool='query_transactions', arguments=TransactionQuery(
+        start=date(2026, 9, 1), end=date(2026, 9, 9), order_by='amount_desc', limit=1,
+    ))
+    rows = [{'date': '2026-09-05', 'payee': '山姆会员店', 'narration': '周末采购', 'amount': '209.00', 'postings': []}]
+    assert AgentGraph._query_reply(rows, plan) == '2026-09-01 至 2026-09-09，金额最大的一笔是 2026-09-05 山姆会员店 · 周末采购，209.00。'
