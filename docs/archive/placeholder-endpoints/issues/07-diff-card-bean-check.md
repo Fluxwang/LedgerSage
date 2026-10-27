@@ -6,7 +6,7 @@
 
 **Blocked by:** None — can start immediately（02 已完成）
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] diff 卡的「校验」区不再出现 `<Stub>`，最后一行显示 bean-check 的状态：通过时显示 ✓「bean-check 通过」，失败时显示「!」和 `bean_check.message`（相对路径）
 - [x] 复用顶栏已经取到的账本状态数据，不为 diff 卡单独发请求；确认写入、撤销或删除之后，diff 卡和顶栏同时刷新

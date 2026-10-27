@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   type Dashboard,
   deleteTransaction,
@@ -7,7 +7,7 @@ import {
   transactions as fetchTransactions,
   undoCommit,
 } from "../api";
-import { Async, num, useAsync } from "../ui";
+import { Async, Modal, num, useAsync } from "../ui";
 
 /** 一次只取 30 条；滚到底再要下一批。 */
 const TX_PAGE_SIZE = 30;
@@ -39,6 +39,8 @@ function DeleteFlow({
   onDeleted: (commit: string, label: string) => void;
 }) {
   const raw = useAsync(() => transactionRaw(row.id), [row.id]);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -59,43 +61,41 @@ function DeleteFlow({
   }
 
   return (
-    <div className="scrim" onClick={onClose}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
-        <div className="in">
-          <h3>删除这笔账目？</h3>
-          <p>
-            下面这段将从账本原文中移除。删除后可以撤销，git 提交前不会落到远端。
-          </p>
-          <Async state={raw}>
-            {(slice) => (
-              <pre>
-                {slice.text
-                  .split("\n")
-                  .map((line) => `- ${line}`)
-                  .join("\n")}
-              </pre>
-            )}
-          </Async>
-          {error && <div className="failed">{error}</div>}
-        </div>
-        <footer>
-          <div className="linkish">
-            {raw.data ? `${raw.data.file} · L${raw.data.start_line}` : row.date}
-          </div>
-          <div className="grow" />
-          <button className="btn" onClick={onClose}>
-            取消
-          </button>
-          <button
-            className="btn danger"
-            disabled={busy || !raw.data}
-            onClick={confirm}
-          >
-            确认删除
-          </button>
-        </footer>
+    <Modal onClose={onClose} busy={busy} initialFocus={cancel} labelledBy={titleId}>
+      <div className="in">
+        <h3 id={titleId}>删除这笔账目？</h3>
+        <p>
+          下面这段将从账本原文中移除。删除后可以撤销，git 提交前不会落到远端。
+        </p>
+        <Async state={raw}>
+          {(slice) => (
+            <pre>
+              {slice.text
+                .split("\n")
+                .map((line) => `- ${line}`)
+                .join("\n")}
+            </pre>
+          )}
+        </Async>
+        {error && <div className="failed">{error}</div>}
       </div>
-    </div>
+      <footer>
+        <div className="linkish">
+          {raw.data ? `${raw.data.file} · L${raw.data.start_line}` : row.date}
+        </div>
+        <div className="grow" />
+        <button ref={cancel} className="btn" disabled={busy} onClick={onClose}>
+          取消
+        </button>
+        <button
+          className="btn danger"
+          disabled={busy || !raw.data}
+          onClick={confirm}
+        >
+          确认删除
+        </button>
+      </footer>
+    </Modal>
   );
 }
 

@@ -51,7 +51,7 @@ function App() {
     <div className="shell">
       <header className="topbar">
         <div className="brand">
-          <i />
+          <img src="/sage.svg" alt="" />
           <b>LedgerSage</b>
         </div>
         <div className="hr" />

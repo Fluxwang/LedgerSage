@@ -11,7 +11,7 @@
 
 **Blocked by:** None — can start immediately（05、06 已完成）
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 先补测试复现两种情况，确认在修之前会话回放确实失败：(a) 留一条未确认的记账写入，然后从账户文件里删掉它用到的那个账户的 `open`；(b) 留一条未确认的写入，然后把账本手改出 bean-check 错误，并让账本不在缓存里（比如重新构造应用）
 - [x] 修复后，两种情况下 `GET /sessions/{thread_id}/runs` 都返回 200；出问题的那条待确认写入 `status` 仍然是 `pending`，没有可确认的回执，并附带一句给人看的原因（比如「账户 Expenses:Food 已不存在，无法预览」）

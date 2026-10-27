@@ -65,6 +65,8 @@ beanbot/test/*
 docs/*
 !docs/adr/
 !docs/agents/
+!docs/archive/
+!docs/database-schema.md
 
 ./Beancount/
 
@@ -95,3 +97,6 @@ pnpm-debug.log*
 *.sqlite-shm
 *.sqlite-wal
 test1.py
+
+# 宣传动画素材，不进仓库
+promo/

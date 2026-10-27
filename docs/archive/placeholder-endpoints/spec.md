@@ -1,9 +1,9 @@
 # 补齐界面上已有占位的 4 个接口
 
-Status: ready-for-agent
+Status: done
 Branch: feat/placeholder-endpoints
 
-术语一律以 [`CONTEXT.md`](../../CONTEXT.md) 为准。本期新增或修订的术语：工作区干净、账本健康度、收款方、缺收款方、常用查询，以及「确认」词条里的 24 小时作废规则。架构决策见 [`docs/adr/`](../../docs/adr/)。实现拆成 4 张票，放在 [`issues/`](issues/) 下。
+术语一律以 [`CONTEXT.md`](../../../CONTEXT.md) 为准。本期新增或修订的术语：工作区干净、账本健康度、收款方、缺收款方、常用查询，以及「确认」词条里的 24 小时作废规则。架构决策见 [`docs/adr/`](../../adr/)。实现拆成 4 张票，放在 [`issues/`](issues/) 下。
 
 ## Problem Statement
 

@@ -116,7 +116,7 @@ function WriteHistory({ health }: { health: LedgerHealthState }) {
   return (
     <div className="pcard">
       <header><b>写入历史</b></header>
-      <div className="in">
+      <div className="in write-history-list">
         <Async state={state}>
           {(rows) => rows.length ? rows.map((row) => (
             <div className={`write-history-row${row.undone_at ? " undone" : ""}`} key={row.commit}>

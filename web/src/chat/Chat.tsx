@@ -1,7 +1,7 @@
 import "./chat.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { clearToken, deleteSession, type Dashboard, token, sessions, sessionRuns, type Session, type SessionReplay } from "../api";
-import { abs, num } from "../ui";
+import { abs, Modal, num } from "../ui";
 import { LedgerPanel } from "./LedgerPanel";
 import type { LedgerHealthState } from "../shell/LedgerHealth";
 import { classify, ReceiptCard, type Receipt, type WriteReceipt } from "./Results";
@@ -86,6 +86,12 @@ export function Chat({
   const [historyError, setHistoryError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingAsk, setPendingAsk] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const deleteRequest = useRef(0);
+  const deleteCancel = useRef<HTMLButtonElement>(null);
+  const deleteTitleId = useId();
   const generation = useRef(0);
   const historyRequest = useRef(0);
   const currentThread = useRef(thread);
@@ -114,16 +120,31 @@ export function Chat({
 
   async function removeConversation(id: string) {
     // 确认或丢弃写入后笔数可能变化，弹框之前重新读取当前状态。
+    const request = ++deleteRequest.current;
     const latest = await sessions();
+    if (request !== deleteRequest.current) return;
     const item = latest.find((row) => row.thread_id === id);
     if (!item) throw new Error("对话不存在，请刷新列表");
-    const pending = item.pending_write_count > 0
-      ? `\n其中 ${item.pending_write_count} 笔待确认的记账会一并丢弃。` : "";
-    if (!window.confirm(`删除对话「${item.title}」？账本不受影响。${pending}`)) return;
-    await deleteSession(id);
-    historyRequest.current++;
-    setHistory((items) => items.filter((row) => row.thread_id !== id));
-    if (currentThread.current === id) newConversation();
+    setDeleteError("");
+    setDeleteTarget(item);
+  }
+
+  async function confirmDeleteConversation() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const id = deleteTarget.thread_id;
+      await deleteSession(id);
+      historyRequest.current++;
+      setHistory((items) => items.filter((row) => row.thread_id !== id));
+      setDeleteTarget(null);
+      if (currentThread.current === id) newConversation();
+    } catch (reason) {
+      setDeleteError((reason as Error).message);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function openSession(id: string) {
@@ -385,6 +406,23 @@ export function Chat({
       </section>
 
       <LedgerPanel receipt={lastWrite} data={data} health={health} file={lastWrite?.file ?? "ledger/"} />
+      {deleteTarget && (
+        <Modal className="modal-compact" onClose={() => setDeleteTarget(null)} busy={deleting}
+          initialFocus={deleteCancel} labelledBy={deleteTitleId}>
+          <div className="in">
+            <h3 id={deleteTitleId}>删除对话？</h3>
+            <p>「{deleteTarget.title}」会从对话列表中移除，账本不受影响。</p>
+            {deleteTarget.pending_write_count > 0 && <p>其中 {deleteTarget.pending_write_count} 笔待确认的记账会一并丢弃。</p>}
+            {deleteError && <div className="failed" role="alert">{deleteError}</div>}
+            <div className="modal-actions">
+              <button ref={deleteCancel} className="btn" disabled={deleting} onClick={() => setDeleteTarget(null)}>取消</button>
+              <button className="btn danger" disabled={deleting} onClick={() => void confirmDeleteConversation()}>
+                {deleting ? "删除中…" : "删除"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

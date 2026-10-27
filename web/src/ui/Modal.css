@@ -1,0 +1,74 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(35, 30, 24, 0.38);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  padding: 24px;
+}
+.modal {
+  width: 560px;
+  max-width: 100%;
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px -20px rgba(35, 30, 24, 0.5);
+  overflow: hidden;
+  animation: lsrise 0.2s ease;
+}
+.modal > .in {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal > .in > * {
+  flex-shrink: 0;
+}
+.modal h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.modal p {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.modal pre {
+  overflow-x: auto;
+  background: var(--sunken);
+  border: 1px solid rgba(35, 30, 24, 0.1);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--red);
+}
+.modal > footer {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(35, 30, 24, 0.1);
+  background: var(--sunken);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.modal-compact {
+  width: 420px;
+}
+.modal-compact p {
+  overflow-wrap: anywhere;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 6px;
+}
