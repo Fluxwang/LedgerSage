@@ -73,17 +73,22 @@ class AgentGraph:
         ledger = self.ledgers.get(state['user'])
         examples = await self.vectors.search(state['user'], state['message']) if self.vectors else []
         batch = await self.model.extract(
-            state['message'], [(a, n) for a, n in ledger.accounts_with_names() if not a.startswith('Equity:')], examples, date.today()
+            state['message'], [(a, n) for a, n in ledger.postable_accounts_with_names() if not a.startswith('Equity:')], examples, date.today()
         )
         transactions = [item.model_dump(mode='json') for item in batch.transactions]
         issues = extraction_issues(state['message'], batch.transactions)
         if not transactions:
             issues.append('没有识别到交易，请补充金额与交易说明')
         evidence: list[dict] = []
+        parents = ledger.parent_accounts
+        refused: list[str] = []
         transactions = [normalize(item) for item in transactions]
         for index, transaction in enumerate(transactions):
             transaction['autofilled'] = []
             for field in FIELDS:
+                if transaction.get(field) in parents:
+                    refused.append(transaction[field])
+                    transaction[field] = None
                 if transaction.get(field) and (transaction[field] not in ledger.accounts or transaction[field].startswith('Equity:')):
                     transaction[field] = None
                 matches = account_confidence(transaction['payee'], role_history(ledger, field))
@@ -94,7 +99,9 @@ class AgentGraph:
                     transaction[field] = matches[0].account
                     transaction['autofilled'].append(field)
         transactions = [normalize(item) for item in transactions]
-        return {'transactions': transactions, 'issue': issues, 'missing': missing_fields(transactions), 'evidence': evidence, 'match_accounts': [], 'match_message': ''}
+        # 汇总账户只挂预算和出报表（ADR 0016），清空后让用户选具体分类。
+        message = ''.join(f'{account} 是汇总账户，请选择它下面的具体分类。' for account in dict.fromkeys(refused))
+        return {'transactions': transactions, 'issue': issues, 'missing': missing_fields(transactions), 'evidence': evidence, 'match_accounts': [], 'match_message': message}
 
     def route_extract(self, state: AgentState) -> str:
         return route_after_extract(state.get('issue', []), state.get('bounce_count', 0), state.get('missing'))

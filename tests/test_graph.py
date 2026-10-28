@@ -328,3 +328,68 @@ def test_reply_names_the_largest_transaction_when_ordered_by_amount():
     ))
     rows = [{'date': '2026-09-05', 'payee': '山姆会员店', 'narration': '周末采购', 'amount': '209.00', 'postings': []}]
     assert AgentGraph._query_reply(rows, plan) == '2026-09-01 至 2026-09-09，金额最大的一笔是 2026-09-05 山姆会员店 · 周末采购，209.00。'
+
+
+def open_parent_food(ledgers, user):
+    """补开汇总账户 Expenses:Food，它下面已有 Expenses:Food:Dining 等末级账户（ADR 0016）。"""
+    ledger = ledgers.get(user)
+    with (ledger.root / 'accounts/expenses.bean').open('a') as stream:
+        stream.write('\n1970-01-01 open Expenses:Food\n  name: "饮食"\n')
+    ledger.reload()
+    return ledger
+
+
+async def test_parent_account_is_not_offered_as_a_candidate(tmp_path):
+    from tests.test_pending_writes import prepared
+
+    class UnknownTargetModel(FixtureModel):
+        async def extract(self, message, accounts, examples, today):
+            self.accounts = [account for account, _ in accounts]
+            return ExtractBatch(transactions=[ExtractedTransaction(
+                amount=Decimal('30'), date=date(2026, 9, 9), payee='便利店',
+                from_account='Assets:WeChat:Balance', to_account=None,
+            )])
+
+    database, user, ledgers = prepared(tmp_path)
+    open_parent_food(ledgers, user)
+    model = UnknownTargetModel()
+    config = settings(tmp_path)
+    config.clarification_candidate_limit = 100
+    service = ChatService(database, AgentGraph(config, database, ledgers, model), 'fixture')
+    events = [event async for event in service.stream(user, 'parent', '买了点吃的30')]
+    assert 'Expenses:Food' not in model.accounts
+    assert events[-1]['type'] == 'ask'
+    assert '饮食' not in events[-1]['candidates']
+    assert '餐饮' in events[-1]['candidates']
+
+
+async def test_parent_account_from_model_is_refused_with_reason(tmp_path):
+    from tests.test_pending_writes import prepared
+
+    class ParentModel(FixtureModel):
+        async def extract(self, message, accounts, examples, today):
+            return ExtractBatch(transactions=[ExtractedTransaction(
+                amount=Decimal('30'), date=date(2026, 9, 9), payee='便利店',
+                from_account='Assets:WeChat:Balance', to_account='Expenses:Food',
+            )])
+
+    database, user, ledgers = prepared(tmp_path)
+    open_parent_food(ledgers, user)
+    service = ChatService(database, AgentGraph(settings(tmp_path), database, ledgers, ParentModel()), 'fixture')
+    events = [event async for event in service.stream(user, 'parent', '买了点吃的30')]
+    assert not any(event['type'] == 'receipt' for event in events)
+    assert events[-1]['type'] == 'ask'
+    assert '汇总账户' in events[-1]['question']
+
+
+async def test_confirm_revalidates_and_refuses_parent_account(tmp_path):
+    from beanbot.exceptions import LedgerWriteConflict
+    from tests.test_pending_writes import prepared, transaction
+
+    database, user, ledgers = prepared(tmp_path)
+    payload = transaction().model_dump(mode='json') | {'to_account': 'Expenses:Food'}
+    pending = database.create_pending(user['id'], None, 'record', {'transactions': [payload]})
+    open_parent_food(ledgers, user)
+    with pytest.raises(LedgerWriteConflict, match='汇总账户'):
+        await PendingWriteService(database, ledgers).confirm(user, pending['id'])
+    assert ledgers.get(user).transactions == []

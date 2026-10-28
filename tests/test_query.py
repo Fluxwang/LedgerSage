@@ -59,3 +59,8 @@ def test_query_without_dates_defaults_to_this_month():
 def test_query_with_only_end_starts_from_that_month():
     query = TransactionQuery(end=date(2026, 9, 15))
     assert (query.start, query.end) == (date(2026, 9, 1), date(2026, 9, 15))
+
+
+def test_query_treats_null_dates_as_omitted():
+    query = TransactionQuery.model_validate({"start": None, "end": None})
+    assert query.start == date.today().replace(day=1)

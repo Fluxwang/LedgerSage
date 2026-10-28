@@ -181,16 +181,21 @@ export const accountTree = (_params: { start: string; end: string }): Promise<Ac
 
 export type StatementCell = { period: string; amount: string };
 export type StatementRow = { account: string; display_name: string; depth: number; cells: StatementCell[] };
+export type IncomeRow = { account: string; display_name: string; depth: number; cells: string[] };
 export type IncomeStatement = {
-  periods: string[];
-  rows: StatementRow[];
-  totals: { expense: string; income: string; net: string; savings_rate: string; peak: StatementCell };
-  composition: { period: string; parts: { account: string; display_name: string; amount: string }[] }[];
+  currency: string;
+  skipped_currencies: string[];
+  periods: { period: string; partial: boolean; through?: string }[];
+  /** 深度优先排列，先 Income 后 Expenses；cells 与 periods 按下标对应，收支都是正数。 */
+  rows: IncomeRow[];
 };
 
-/** 收支表：按账户 × 月的矩阵 + 堆叠构成。/dashboard 只给单区间的分类合计。 */
-export const incomeStatement = (_params: { start: string; end: string; account?: string; tag?: string }): Promise<IncomeStatement> =>
-  pending("GET /statements/income", "收支表要按账户层级 × 多个月出矩阵");
+/** 收支表：账户层级 × 月的发生额矩阵，合计、储蓄率、构成都由前端从 rows 推导。 */
+export const incomeStatement = (params: { start?: string; end?: string }) => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value) query.set(key, value);
+  return api<IncomeStatement>(`/statements/income?${query}`);
+};
 
 export type BalanceSheet = {
   as_of: string;

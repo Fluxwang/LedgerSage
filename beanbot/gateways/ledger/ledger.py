@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterable
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 from beancount import loader
 from beancount.core import data
@@ -28,6 +28,8 @@ from beanbot.gateways.ledger.periods import BUDGET_PERIODS, period_bounds, today
 from beanbot.gateways.ledger.repo import (
     commit_only, git, init_repo, ledger_root, scaffold_ledger,
 )
+
+K = TypeVar("K")
 
 
 class Ledger:
@@ -56,6 +58,21 @@ class Ledger:
             for entry in self._entries
             if isinstance(entry, data.Open)
         )
+
+    @property
+    def parent_accounts(self) -> set[str]:
+        """下面还有已开户子账户的汇总账户，只挂预算、出报表，不能直接记账（ADR 0016）。"""
+        accounts = self.accounts
+        return {
+            account
+            for account in accounts
+            if any(other.startswith(account + ":") for other in accounts)
+        }
+
+    def postable_accounts_with_names(self) -> list[tuple[str, str | None]]:
+        """可以直接记账的账户：已开户且不是汇总账户。"""
+        parents = self.parent_accounts
+        return [item for item in self.accounts_with_names() if item[0] not in parents]
 
     @property
     def transactions(self) -> list[data.Transaction]:
@@ -258,11 +275,11 @@ class Ledger:
         self,
         start: date,
         end: date,
-        key: Callable[[data.Transaction, data.Posting], str],
-        prefix: str = "",
-    ) -> dict[str, Decimal]:
+        key: Callable[[data.Transaction, data.Posting], K],
+        prefix: str | tuple[str, ...] = "",
+    ) -> dict[K, Decimal]:
         """区间内按 key 汇总本位币记账额；金额保持符号，退款才能把支出冲回去。"""
-        totals: dict[str, Decimal] = {}
+        totals: dict[K, Decimal] = {}
         currency = self.operating_currency
         for transaction in self.transactions:
             if not start <= transaction.date <= end:
@@ -298,6 +315,37 @@ class Ledger:
             end,
             lambda transaction, _: transaction.date.strftime("%Y-%m"),
             "Expenses:",
+        )
+
+    def monthly_movement(
+        self, start: date, end: date, prefixes: tuple[str, ...]
+    ) -> dict[tuple[str, str], Decimal]:
+        """区间内按 (YYYY-MM, 账户) 汇总的本位币发生额，收支表的矩阵由此推出。"""
+        return self._fold_postings(
+            start,
+            end,
+            lambda transaction, posting: (
+                transaction.date.strftime("%Y-%m"),
+                posting.account,
+            ),
+            prefixes,
+        )
+
+    def skipped_currencies(
+        self, start: date, end: date, prefixes: tuple[str, ...]
+    ) -> list[str]:
+        """区间内因不是本位币而没被汇总的分录行币种，去重排序。"""
+        currency = self.operating_currency
+        return sorted(
+            {
+                posting.units.currency
+                for transaction in self.transactions
+                if start <= transaction.date <= end
+                for posting in transaction.postings
+                if posting.units
+                and posting.units.currency != currency
+                and posting.account.startswith(prefixes)
+            }
         )
 
     def movement(self, start: date, end: date) -> dict[str, Decimal]:
@@ -587,12 +635,17 @@ class Ledger:
     ) -> list[TransactionInput]:
         batch = list(transactions)
         accounts = self.accounts
+        parents = self.parent_accounts
         for index, transaction in enumerate(batch, 1):
             for field in ("from_account", "to_account"):
                 account = getattr(transaction, field)
                 if account not in accounts:
                     raise AccountNotFound(
                         f"第 {index} 笔的 {field} 账户不存在：{account}"
+                    )
+                if account in parents:
+                    raise LedgerWriteConflict(
+                        f"第 {index} 笔的 {account} 是汇总账户，请选择它下面的具体分类"
                     )
         return batch
 
