@@ -13,9 +13,9 @@ export const monthLabel = (iso: string) => `${iso.slice(5, 7)} 月`;
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
+/** 含当月在内往前数 count 个月的 YYYY-MM；按本地时间算，toISOString 在月初清晨会退到上个月。 */
 export function monthsBack(count: number): string {
   const now = new Date();
-  now.setDate(1);
-  now.setMonth(now.getMonth() - (count - 1));
-  return now.toISOString().slice(0, 7);
+  const first = new Date(now.getFullYear(), now.getMonth() - (count - 1), 1);
+  return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, "0")}`;
 }

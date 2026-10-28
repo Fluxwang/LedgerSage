@@ -81,6 +81,16 @@
 .conversation-menu {
   top: 32px;
 }
+.conversation-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.menu-key {
+  font: 11px var(--mono);
+  color: var(--ink-3);
+}
 .conversation-menu .conversation-delete {
   color: var(--red);
 }
@@ -158,11 +168,9 @@
   align-items: center;
   gap: 8px;
 }
-.reply > header i {
+.reply > header img {
   width: 20px;
   height: 20px;
-  border-radius: 6px;
-  background: var(--green);
   flex: none;
 }
 .reply > header b {
@@ -399,6 +407,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 分组汇总的标签是分类名或商户名，比月份长 */
+.barrow.wide > .lbl {
+  width: 112px;
 }
 /* 账户名太长会压到条形图上：省略号留给前缀，末级账户名始终看得见 */
 .barrow.cat > .lbl {

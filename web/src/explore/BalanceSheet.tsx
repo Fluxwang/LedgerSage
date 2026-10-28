@@ -1,5 +1,5 @@
 import type { Dashboard } from "../api";
-import { num, Stub } from "../ui";
+import { num } from "../ui";
 import { SHADES } from "./shades";
 
 export function BalanceSheet({ data }: { data: Dashboard }) {
@@ -142,11 +142,6 @@ export function BalanceSheet({ data }: { data: Dashboard }) {
             </tbody>
           </table>
         </div>
-        <footer>
-          <div className="linkish">
-            设计稿要的是 07 / 08 / 当前三列期末余额，需要按日期回溯的余额端点
-          </div>
-        </footer>
       </div>
 
       <div className="card">
@@ -189,11 +184,6 @@ export function BalanceSheet({ data }: { data: Dashboard }) {
           </div>
         </div>
       </div>
-
-      <Stub
-        endpoint="GET /statements/balance"
-        why="净资产走势（近六月）、按月的期末余额列，以及 balance 指令的对账状态，都没有对应端点。"
-      />
     </>
   );
 }

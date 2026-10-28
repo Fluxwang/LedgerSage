@@ -482,3 +482,14 @@
 .toast .btn:hover {
   background: rgba(246, 243, 237, 0.12);
 }
+
+/* 收支表格子：点一下下钻到对应月份的流水 */
+.cellbtn:hover {
+  color: var(--green);
+  text-decoration: underline;
+}
+.matrix th small {
+  font-size: 9px;
+  letter-spacing: 0;
+  text-transform: none;
+}

@@ -55,14 +55,29 @@ def normalize_period(value: str | DateRange, today: date | None = None) -> DateR
 
 
 class TransactionQuery(BaseModel):
-    start: date
-    end: date
+    # 用户没说时间范围时留空，默认查本月
+    start: date = Field(default_factory=lambda: date.today().replace(day=1))
+    end: date = Field(default_factory=date.today)
     account_prefix: str | None = None
     payee: str | None = None
     min_amount: float | None = None
     max_amount: float | None = None
     group_by: Literal["none", "day", "month", "account", "payee"] = "none"
+    order_by: Literal["date", "amount_desc"] = "date"
     limit: int = Field(default=100, ge=1, le=1000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_dates(cls, values):
+        """模型留空时可能传 null；只给了 end 时从 end 所在月 1 号开始。"""
+        if not isinstance(values, dict):
+            return values
+        values = {key: value for key, value in values.items() if not (key in ("start", "end") and value is None)}
+        if "end" in values and "start" not in values:
+            end = values["end"]
+            end = date.fromisoformat(end) if isinstance(end, str) else end
+            values["start"] = end.replace(day=1)
+        return values
 
     @model_validator(mode="after")
     def validate_dates(self):

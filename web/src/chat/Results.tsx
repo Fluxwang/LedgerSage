@@ -280,7 +280,7 @@ function BudgetRows({ rows }: { rows: any[] }) {
 }
 
 /** group_by 的返回：[{group, amount}]，画成设计稿里的横条。 */
-function GroupBars({ rows }: { rows: { group: string; amount: string }[] }) {
+function GroupBars({ rows }: { rows: { group: string; display_name?: string; amount: string }[] }) {
   const max = Math.max(1, ...rows.map((row) => Math.abs(Number(row.amount))));
   return (
     <div className="card">
@@ -295,7 +295,9 @@ function GroupBars({ rows }: { rows: { group: string; amount: string }[] }) {
           return (
             <Bar
               key={row.group}
-              label={row.group || "—"}
+              label={row.display_name || row.group || "—"}
+              title={row.group}
+              wide
               value={num(value, 0)}
               share={(value / max) * 100}
               peak={value === max}
@@ -383,7 +385,7 @@ export function QueryCard({ receipt, canSave = true }: { receipt: QueryReceipt; 
   const isBudget = Array.isArray(result) && result.length > 0 && "used" in result[0] && "amount" in result[0];
   const isGroup = Array.isArray(result) && result.length > 0 && "group" in result[0];
   const isRows = Array.isArray(result) && result.length > 0 && "postings" in result[0];
-  const isAccounts = Array.isArray(result) && result.length > 0 && "display_name" in result[0] && !("used" in result[0]);
+  const isAccounts = Array.isArray(result) && result.length > 0 && "display_name" in result[0] && !("used" in result[0]) && !isGroup;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
       {receipt.run_id && (
@@ -395,7 +397,7 @@ export function QueryCard({ receipt, canSave = true }: { receipt: QueryReceipt; 
         </div>
       )}
       <div className="card">
-        <Disclose label={`${receipt.tool} 的参数`} defaultOpen>
+        <Disclose label={`${receipt.tool} 的参数`}>
           <div className="io" style={{ gridTemplateColumns: "1fr", borderTop: 0 }}>
             <div>
               <div className="kicker">arguments</div>

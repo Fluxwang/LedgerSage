@@ -1,10 +1,12 @@
 """确定性的账本、仪表盘与撤销端点。"""
 
+import calendar
+import re
 from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import Field
 
 from beanbot.api.auth import CurrentUser
@@ -13,6 +15,7 @@ from beanbot.gateways.ledger.repo import ledger_root
 from beanbot.gateways.ledger.status import ledger_status
 from beanbot.gateways.ledger.accounts import account_matches
 from beanbot.gateways.ledger.history import write_history
+from beanbot.gateways.ledger.statements import income_statement
 
 router = APIRouter()
 
@@ -23,6 +26,8 @@ TREND_MONTHS = 6
 TRANSACTIONS_PAGE_SIZE = 20
 # 流水页在内存里筛选，先划一条上限免得整本账本都进来。
 TRANSACTIONS_LIMIT = 5000
+STATEMENT_MAX_MONTHS = 24
+MONTH = re.compile(r"(\d{4})-(0[1-9]|1[0-2])")
 
 
 def shape(row: dict) -> dict:
@@ -208,3 +213,34 @@ async def dashboard(
         "budgets": ledger.budget_status(today),
         "period": {"start": start.isoformat(), "end": end.isoformat(), "name": period},
     }
+
+
+def parse_month(value: str, field: str) -> date:
+    """YYYY-MM 换成当月 1 日，格式不对返回 422。"""
+    matched = MONTH.fullmatch(value)
+    if not matched:
+        raise HTTPException(status_code=422, detail=f"{field} 必须是 YYYY-MM 格式")
+    return date(int(matched[1]), int(matched[2]), 1)
+
+
+@router.get("/statements/income")
+async def statements_income(
+    request: Request, user: CurrentUser, start: str | None = None, end: str | None = None
+):
+    """收支表：账户层级 × 月的发生额矩阵，不经过 Agent（ADR 0006）。"""
+    today = date.today()
+    end_month = parse_month(end, "end") if end else today.replace(day=1)
+    if end_month > today:
+        raise HTTPException(status_code=422, detail="end 不能是未来月份")
+    since = parse_month(start, "start") if start else trend_months(end_month)[0]
+    if since > end_month:
+        raise HTTPException(status_code=422, detail="start 不能晚于 end")
+    span = (end_month.year - since.year) * 12 + end_month.month - since.month + 1
+    if span > STATEMENT_MAX_MONTHS:
+        raise HTTPException(
+            status_code=422, detail=f"跨度不能超过 {STATEMENT_MAX_MONTHS} 个月"
+        )
+    # 当月截到今天，最后一列由此标为 partial。
+    last_day = calendar.monthrange(end_month.year, end_month.month)[1]
+    until = min(end_month.replace(day=last_day), today)
+    return income_statement(user_ledger(request, user), since, until)

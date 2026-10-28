@@ -48,3 +48,19 @@ def test_query_range_rejects_future_and_more_than_five_years():
         DateRange(start=date.today(), end=date(date.today().year + 1, 1, 1))
     with pytest.raises(ValueError, match="5 年"):
         DateRange(start=date(2010, 1, 1), end=date(2020, 1, 1))
+
+
+def test_query_without_dates_defaults_to_this_month():
+    today = date.today()
+    query = TransactionQuery()
+    assert (query.start, query.end) == (today.replace(day=1), today)
+
+
+def test_query_with_only_end_starts_from_that_month():
+    query = TransactionQuery(end=date(2026, 9, 15))
+    assert (query.start, query.end) == (date(2026, 9, 1), date(2026, 9, 15))
+
+
+def test_query_treats_null_dates_as_omitted():
+    query = TransactionQuery.model_validate({"start": None, "end": None})
+    assert query.start == date.today().replace(day=1)

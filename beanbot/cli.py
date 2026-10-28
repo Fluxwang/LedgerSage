@@ -62,7 +62,9 @@ def main():
                 host="127.0.0.1",
                 port=args.port,
                 workers=1,
+                reload=True,
             )
+
         finally:
             frontend.terminate()
             frontend.wait()

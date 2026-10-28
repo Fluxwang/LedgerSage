@@ -73,17 +73,22 @@ class AgentGraph:
         ledger = self.ledgers.get(state['user'])
         examples = await self.vectors.search(state['user'], state['message']) if self.vectors else []
         batch = await self.model.extract(
-            state['message'], [(a, n) for a, n in ledger.accounts_with_names() if not a.startswith('Equity:')], examples, date.today()
+            state['message'], [(a, n) for a, n in ledger.postable_accounts_with_names() if not a.startswith('Equity:')], examples, date.today()
         )
         transactions = [item.model_dump(mode='json') for item in batch.transactions]
         issues = extraction_issues(state['message'], batch.transactions)
         if not transactions:
             issues.append('没有识别到交易，请补充金额与交易说明')
         evidence: list[dict] = []
+        parents = ledger.parent_accounts
+        refused: list[str] = []
         transactions = [normalize(item) for item in transactions]
         for index, transaction in enumerate(transactions):
             transaction['autofilled'] = []
             for field in FIELDS:
+                if transaction.get(field) in parents:
+                    refused.append(transaction[field])
+                    transaction[field] = None
                 if transaction.get(field) and (transaction[field] not in ledger.accounts or transaction[field].startswith('Equity:')):
                     transaction[field] = None
                 matches = account_confidence(transaction['payee'], role_history(ledger, field))
@@ -94,7 +99,9 @@ class AgentGraph:
                     transaction[field] = matches[0].account
                     transaction['autofilled'].append(field)
         transactions = [normalize(item) for item in transactions]
-        return {'transactions': transactions, 'issue': issues, 'missing': missing_fields(transactions), 'evidence': evidence, 'match_accounts': [], 'match_message': ''}
+        # 汇总账户只挂预算和出报表（ADR 0016），清空后让用户选具体分类。
+        message = ''.join(f'{account} 是汇总账户，请选择它下面的具体分类。' for account in dict.fromkeys(refused))
+        return {'transactions': transactions, 'issue': issues, 'missing': missing_fields(transactions), 'evidence': evidence, 'match_accounts': [], 'match_message': message}
 
     def route_extract(self, state: AgentState) -> str:
         return route_after_extract(state.get('issue', []), state.get('bounce_count', 0), state.get('missing'))
@@ -211,7 +218,7 @@ class AgentGraph:
                 plan.arguments.payee, plan.arguments.limit,
                 Decimal(str(plan.arguments.min_amount)) if plan.arguments.min_amount is not None else None,
                 Decimal(str(plan.arguments.max_amount)) if plan.arguments.max_amount is not None else None,
-                plan.arguments.group_by,
+                plan.arguments.group_by, plan.arguments.order_by,
             )
         else:
             result = {'error': '查询参数不足'}
@@ -248,6 +255,10 @@ class AgentGraph:
             if args.group_by != 'none':
                 total = sum((Decimal(row['amount']) for row in result), Decimal())
                 return f'{scope}共 {len(result)} 组，金额合计 {total:.2f}。'
+            if args.order_by == 'amount_desc':
+                top = result[0]
+                head = '金额最大的一笔是' if len(result) == 1 else f'金额最大的 {len(result)} 笔里，第一笔是'
+                return f"{scope}{head} {top['date']} {top['payee'] or ''} · {top['narration']}，{top['amount']}。"
             total = sum((Decimal(posting['amount']) for row in result for posting in row.get('postings', [])
                          if posting.get('amount') and account_matches(posting.get('account', ''), 'Expenses')), Decimal())
             return f'{scope}共 {len(result)} 笔，支出合计 {total:.2f}。'

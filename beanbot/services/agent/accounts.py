@@ -45,7 +45,7 @@ def allowed_accounts(
     )
     return [
         (account, name)
-        for account, name in ledger.accounts_with_names()
+        for account, name in ledger.postable_accounts_with_names()
         if account != other and account.startswith(prefixes)
     ]
 
